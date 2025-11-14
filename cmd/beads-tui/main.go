@@ -1121,7 +1121,7 @@ func main() {
 			}
 
 			issueID := issue.ID // Capture before potential refresh
-			cmd := fmt.Sprintf("bd label %s %q", issueID, trimmedLabel)
+			cmd := fmt.Sprintf("bd label add %s %q", issueID, trimmedLabel)
 			log.Printf("BD COMMAND: Adding label: %s", cmd)
 			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 			if err != nil {
@@ -1147,7 +1147,7 @@ func main() {
 				buttonLabel := fmt.Sprintf("Remove '%s'", labelToRemove)
 				form.AddButton(buttonLabel, func() {
 					issueID := issue.ID
-					cmd := fmt.Sprintf("bd label %s --remove %q", issueID, labelToRemove)
+					cmd := fmt.Sprintf("bd label remove %s %q", issueID, labelToRemove)
 					log.Printf("BD COMMAND: Removing label: %s", cmd)
 					output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 					if err != nil {
