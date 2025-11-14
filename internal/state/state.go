@@ -23,9 +23,10 @@ type State struct {
 	treeNodes        []*TreeNode
 
 	// Filter state
-	priorityFilter map[int]bool           // nil = no filter, otherwise only show these priorities
+	priorityFilter map[int]bool              // nil = no filter, otherwise only show these priorities
 	typeFilter     map[parser.IssueType]bool // nil = no filter, otherwise only show these types
 	statusFilter   map[parser.Status]bool    // nil = no filter, otherwise only show these statuses
+	labelFilter    map[string]bool           // nil = no filter, otherwise only show issues with these labels
 }
 
 // FilterMode represents different filtering options
@@ -145,7 +146,7 @@ func (s *State) categorizeIssues() {
 
 // applyFilters filters a list of issues based on active filters
 func (s *State) applyFilters(issues []*parser.Issue) []*parser.Issue {
-	if s.priorityFilter == nil && s.typeFilter == nil && s.statusFilter == nil {
+	if s.priorityFilter == nil && s.typeFilter == nil && s.statusFilter == nil && s.labelFilter == nil {
 		return issues
 	}
 
@@ -164,6 +165,21 @@ func (s *State) applyFilters(issues []*parser.Issue) []*parser.Issue {
 		// Check status filter
 		if s.statusFilter != nil && !s.statusFilter[issue.Status] {
 			continue
+		}
+
+		// Check label filter
+		if s.labelFilter != nil {
+			// Issue must have at least one of the filtered labels
+			hasMatchingLabel := false
+			for _, label := range issue.Labels {
+				if s.labelFilter[label] {
+					hasMatchingLabel = true
+					break
+				}
+			}
+			if !hasMatchingLabel {
+				continue
+			}
 		}
 
 		filtered = append(filtered, issue)
@@ -377,11 +393,28 @@ func (s *State) ToggleStatusFilter(status parser.Status) {
 	}
 }
 
+// ToggleLabelFilter toggles a label in the filter
+func (s *State) ToggleLabelFilter(label string) {
+	if s.labelFilter == nil {
+		s.labelFilter = make(map[string]bool)
+	}
+
+	if s.labelFilter[label] {
+		delete(s.labelFilter, label)
+		if len(s.labelFilter) == 0 {
+			s.labelFilter = nil
+		}
+	} else {
+		s.labelFilter[label] = true
+	}
+}
+
 // ClearAllFilters removes all active filters
 func (s *State) ClearAllFilters() {
 	s.priorityFilter = nil
 	s.typeFilter = nil
 	s.statusFilter = nil
+	s.labelFilter = nil
 }
 
 // IsPriorityFiltered returns true if the given priority is in the active filter
@@ -399,9 +432,14 @@ func (s *State) IsStatusFiltered(status parser.Status) bool {
 	return s.statusFilter != nil && s.statusFilter[status]
 }
 
+// IsLabelFiltered returns true if the given label is in the active filter
+func (s *State) IsLabelFiltered(label string) bool {
+	return s.labelFilter != nil && s.labelFilter[label]
+}
+
 // HasActiveFilters returns true if any filters are active
 func (s *State) HasActiveFilters() bool {
-	return s.priorityFilter != nil || s.typeFilter != nil || s.statusFilter != nil
+	return s.priorityFilter != nil || s.typeFilter != nil || s.statusFilter != nil || s.labelFilter != nil
 }
 
 // GetActiveFilters returns a human-readable description of active filters
@@ -451,5 +489,32 @@ func (s *State) GetActiveFilters() string {
 		}
 	}
 
+	// Label filters
+	if s.labelFilter != nil {
+		var labels []string
+		for label := range s.labelFilter {
+			labels = append(labels, label)
+		}
+		if len(labels) > 0 {
+			filters = append(filters, "Label: "+strings.Join(labels, ","))
+		}
+	}
+
 	return strings.Join(filters, " | ")
+}
+
+// GetAllLabels returns all unique labels across all issues
+func (s *State) GetAllLabels() []string {
+	labelSet := make(map[string]bool)
+	for _, issue := range s.issues {
+		for _, label := range issue.Labels {
+			labelSet[label] = true
+		}
+	}
+
+	labels := make([]string, 0, len(labelSet))
+	for label := range labelSet {
+		labels = append(labels, label)
+	}
+	return labels
 }

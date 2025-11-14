@@ -741,11 +741,13 @@ func main() {
   p0-p4    Priority (e.g., 'p1' or 'p1,p2')
   bug, feature, task, epic, chore    Types
   open, in_progress, blocked, closed    Statuses
+  #label   Label (e.g., '#ui' or '#bug,#urgent')
 
 [cyan]Examples:[-]
   p1 bug          P1 bugs only
   feature,task    Features and tasks
   p0,p1 open      High priority open issues
+  #ui #urgent     Issues with 'ui' or 'urgent' labels
 
 [gray]Leave empty to clear all filters[-]`
 
@@ -778,6 +780,15 @@ func main() {
 			for _, token := range tokens {
 				token = strings.TrimSpace(token)
 				if token == "" {
+					continue
+				}
+
+				// Check for label (starts with #)
+				if strings.HasPrefix(token, "#") {
+					label := strings.TrimPrefix(token, "#")
+					if label != "" {
+						appState.ToggleLabelFilter(label)
+					}
 					continue
 				}
 
