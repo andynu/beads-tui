@@ -111,7 +111,6 @@ func main() {
 
 	// Two-character shortcut state
 	var lastKeyWasS bool // For status shortcuts (So, Si, Sb, Sc)
-	var lastKeyWasT bool // For type shortcuts (Tf, Tb, Tt, Td)
 
 	// Mouse mode state (default: enabled)
 	var mouseEnabled = true
@@ -1149,11 +1148,6 @@ func main() {
   Si          Set status to in_progress
   Sb          Set status to blocked
   Sc          Set status to closed
-  Tf          Set type to feature
-  Tb          Set type to bug
-  Tt          Set type to task
-  Te          Set type to epic
-  Tc/Td       Set type to chore (doc/maintenance)
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
@@ -2243,46 +2237,6 @@ func main() {
 				return nil
 			}
 
-			// Handle type shortcuts (T + second char)
-			if lastKeyWasT {
-				var newType string
-				switch event.Rune() {
-				case 'f':
-					newType = "feature"
-				case 'b':
-					newType = "bug"
-				case 't':
-					newType = "task"
-				case 'e':
-					newType = "epic"
-				case 'c', 'd':  // Both Tc and Td map to chore
-					newType = "chore"
-				default:
-					// Invalid second key, reset and fall through
-					lastKeyWasT = false
-					statusBar.SetText(getStatusBarText())
-					return nil
-				}
-
-				// Execute type update
-				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-					issueID := issue.ID
-					cmd := fmt.Sprintf("bd update %s --type %s", issueID, newType)
-					log.Printf("BD COMMAND: Executing type update (T%c): %s", event.Rune(), cmd)
-					err := exec.Command("sh", "-c", cmd).Run()
-					if err != nil {
-						statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-					} else {
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issueID, newType))
-						time.AfterFunc(500*time.Millisecond, func() {
-							refreshIssues(issueID)
-						})
-					}
-				}
-				lastKeyWasT = false
-				return nil
-			}
-
 			// Normal single-key handling
 			switch event.Rune() {
 			case 'q':
@@ -2328,19 +2282,10 @@ func main() {
 				prevSearchMatch()
 				return nil
 			case 't':
-				// Initiate type shortcut sequence
-				lastKeyWasT = true
-				lastKeyWasS = false
-				statusBar.SetText("[yellow]Type shortcut: f/b/t/e/c/d (chore)[-]")
-				// Reset after 2 seconds if no second key
-				time.AfterFunc(2*time.Second, func() {
-					app.QueueUpdateDraw(func() {
-						if lastKeyWasT {
-							lastKeyWasT = false
-							statusBar.SetText(getStatusBarText())
-						}
-					})
-				})
+				// Toggle view mode
+				appState.ToggleViewMode()
+				statusBar.SetText(getStatusBarText())
+				populateIssueList()
 				return nil
 			case 'C':
 				// Toggle showing closed issues
@@ -2480,7 +2425,6 @@ func main() {
 			case 's':
 				// Initiate status shortcut sequence
 				lastKeyWasS = true
-				lastKeyWasT = false
 				statusBar.SetText("[yellow]Status shortcut: o/i/b/c[-]")
 				// Reset after 2 seconds if no second key
 				time.AfterFunc(2*time.Second, func() {
@@ -2500,7 +2444,6 @@ func main() {
 				// Reset all multi-key flags if any other key is pressed
 				lastKeyWasG = false
 				lastKeyWasS = false
-				lastKeyWasT = false
 			}
 		case tcell.KeyEscape:
 			// Clear search on ESC
