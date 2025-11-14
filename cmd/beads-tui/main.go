@@ -610,7 +610,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Add Comment ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Add Comment (Ctrl-S to save) ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("comment_dialog")
 			app.SetFocus(issueList)
@@ -1185,7 +1185,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Close Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Close Issue (Enter to submit) ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("close_issue_dialog")
 			app.SetFocus(issueList)
@@ -1281,7 +1281,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Reopen Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Reopen Issue (Enter to submit) ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("reopen_issue_dialog")
 			app.SetFocus(issueList)
