@@ -219,7 +219,7 @@ func main() {
 			// Add ready issues
 			readyIssues := appState.GetReadyIssues()
 			if len(readyIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+				issueList.AddItem(fmt.Sprintf("[limegreen::b]⬤ READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
 				currentIndex++
 
 				for _, issue := range readyIssues {
@@ -235,7 +235,7 @@ func main() {
 			// Add blocked issues
 			blockedIssues := appState.GetBlockedIssues()
 			if len(blockedIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
+				issueList.AddItem(fmt.Sprintf("\n[gold::b]⬤ BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
 				currentIndex++
 
 				for _, issue := range blockedIssues {
@@ -251,7 +251,7 @@ func main() {
 			// Add in-progress issues
 			inProgressIssues := appState.GetInProgressIssues()
 			if len(inProgressIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+				issueList.AddItem(fmt.Sprintf("\n[deepskyblue::b]⬤ IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
 				currentIndex++
 
 				for _, issue := range inProgressIssues {
@@ -409,7 +409,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
 				} else {
 					log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", currentDetailIssue.ID)
-					statusBar.SetText(fmt.Sprintf("[green]✓ Copied %s to clipboard[-]", currentDetailIssue.ID))
+					statusBar.SetText(fmt.Sprintf("[limegreen]✓ Copied[-] [white]%s[-] [limegreen]to clipboard[-]", currentDetailIssue.ID))
 					// Clear message after 2 seconds
 					time.AfterFunc(2*time.Second, func() {
 						app.QueueUpdateDraw(func() {
@@ -592,7 +592,7 @@ func main() {
 				statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
 			} else {
 				log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
-				statusBar.SetText("[green]✓ Comment added successfully[-]")
+				statusBar.SetText("[limegreen]✓ Comment added successfully[-]")
 
 				// Close dialog
 				pages.RemovePage("comment_dialog")
@@ -633,7 +633,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
 				} else {
 					log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
-					statusBar.SetText("[green]✓ Comment added successfully[-]")
+					statusBar.SetText("[limegreen]✓ Comment added successfully[-]")
 					pages.RemovePage("comment_dialog")
 					app.SetFocus(issueList)
 					issueID := issue.ID
@@ -848,17 +848,19 @@ func main() {
 
 [cyan::b]Priority Colors[-::-]
   [red]P0[-]          Critical
-  [orange]P1[-]          High
-  P2          Normal (white)
-  [gray]P3[-]          Low
-  [darkgray]P4[-]          Lowest
+  [orangered]P1[-]          High
+  [lightskyblue]P2[-]          Normal
+  [darkgray]P3[-]          Low
+  [gray]P4[-]          Lowest
 
 [cyan::b]Status Colors[-::-]
-  [green]●[-]           Ready
-  [yellow]○[-]           Blocked
-  [blue]◆[-]           In Progress
+  [limegreen]●[-]           Ready
+  [gold]○[-]           Blocked
+  [deepskyblue]◆[-]           In Progress
+  [darkgray]·[-]           Closed
 
-[gray]Press ESC or ? to close this help screen[-]`
+[gray]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]
+[yellow]Press ESC or ? to close this help[-]`
 
 		// Create help text view
 		helpTextView := tview.NewTextView().
@@ -1006,7 +1008,7 @@ func main() {
 		if err := app.Draw(); err != nil {
 			log.Printf("APP ERROR: Failed to redraw after editor: %v", err)
 		}
-		statusBar.SetText(fmt.Sprintf("[green]✓ Updated %s for %s[-]", fieldName, issue.ID))
+		statusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [yellow]%s[-] [limegreen]for[-] [white]%s[-]", fieldName, issue.ID))
 		time.AfterFunc(500*time.Millisecond, func() {
 			refreshIssues(issue.ID)
 		})
@@ -1067,7 +1069,7 @@ func main() {
 				statusBar.SetText(fmt.Sprintf("[red]Error adding dependency: %v[-]", err))
 			} else {
 				log.Printf("BD COMMAND: Dependency added successfully")
-				statusBar.SetText(fmt.Sprintf("[green]✓ Added %s dependency to %s[-]", depType, targetID))
+				statusBar.SetText(fmt.Sprintf("[limegreen]✓ Added[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depType, targetID))
 				pages.RemovePage("dependency_dialog")
 				app.SetFocus(issueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -1093,7 +1095,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[red]Error removing dependency: %v[-]", err))
 					} else {
 						log.Printf("BD COMMAND: Dependency removed successfully")
-						statusBar.SetText(fmt.Sprintf("[green]✓ Removed %s dependency to %s[-]", depToRemove.Type, depToRemove.DependsOnID))
+						statusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depToRemove.Type, depToRemove.DependsOnID))
 						pages.RemovePage("dependency_dialog")
 						app.SetFocus(issueList)
 						time.AfterFunc(500*time.Millisecond, func() {
@@ -1187,7 +1189,7 @@ func main() {
 				statusBar.SetText(fmt.Sprintf("[red]Error adding label: %v[-]", err))
 			} else {
 				log.Printf("BD COMMAND: Label added successfully")
-				statusBar.SetText(fmt.Sprintf("[green]✓ Added label '%s'[-]", trimmedLabel))
+				statusBar.SetText(fmt.Sprintf("[limegreen]✓ Added label[-] [yellow]'%s'[-]", trimmedLabel))
 				pages.RemovePage("label_dialog")
 				app.SetFocus(issueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -1213,7 +1215,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[red]Error removing label: %v[-]", err))
 					} else {
 						log.Printf("BD COMMAND: Label removed successfully")
-						statusBar.SetText(fmt.Sprintf("[green]✓ Removed label '%s'[-]", labelToRemove))
+						statusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed label[-] [yellow]'%s'[-]", labelToRemove))
 						pages.RemovePage("label_dialog")
 						app.SetFocus(issueList)
 						time.AfterFunc(500*time.Millisecond, func() {
@@ -1501,7 +1503,7 @@ func main() {
 				statusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
 			} else {
 				log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
-				statusBar.SetText("[green]✓ Issue created successfully[-]")
+				statusBar.SetText("[limegreen]✓ Issue created successfully[-]")
 
 				// Close dialog
 				pages.RemovePage("create_issue")
@@ -1554,7 +1556,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
 				} else {
 					log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
-					statusBar.SetText("[green]✓ Issue created successfully[-]")
+					statusBar.SetText("[limegreen]✓ Issue created successfully[-]")
 					pages.RemovePage("create_issue")
 					app.SetFocus(issueList)
 					time.AfterFunc(500*time.Millisecond, func() {
@@ -1927,15 +1929,15 @@ func findBeadsDir() (string, error) {
 func getPriorityColor(priority int) string {
 	switch priority {
 	case 0:
-		return "red"
+		return "red" // Critical - bright red
 	case 1:
-		return "orange"
+		return "orangered" // High - orange-red for urgency
 	case 2:
-		return "white"
+		return "lightskyblue" // Normal - calm blue
 	case 3:
-		return "gray"
+		return "darkgray" // Low - subdued gray
 	case 4:
-		return "darkgray"
+		return "gray" // Lowest - very subdued
 	default:
 		return "white"
 	}
@@ -2040,13 +2042,13 @@ func formatIssueDetails(issue *parser.Issue) string {
 func getStatusColor(status parser.Status) string {
 	switch status {
 	case parser.StatusOpen:
-		return "green"
+		return "limegreen" // Open - bright green for ready work
 	case parser.StatusInProgress:
-		return "blue"
+		return "deepskyblue" // In Progress - vibrant blue for active work
 	case parser.StatusBlocked:
-		return "yellow"
+		return "gold" // Blocked - gold/yellow for warning
 	case parser.StatusClosed:
-		return "gray"
+		return "darkgray" // Closed - muted gray
 	default:
 		return "white"
 	}
