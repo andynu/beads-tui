@@ -45,6 +45,9 @@ func main() {
 		ShowSecondaryText(false)
 	issueList.SetBorder(true).SetTitle("Issues")
 
+	// Track mapping from list index to issue
+	indexToIssue := make(map[int]*parser.Issue)
+
 	// Function to load and display issues
 	refreshIssues := func() {
 		// Parse issues
@@ -63,21 +66,27 @@ func main() {
 		// Update UI on main thread
 		app.QueueUpdateDraw(func() {
 			// Update status bar
-			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
+			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh, Enter for details]",
 				beadsDir, len(issues)))
 
 			// Clear and rebuild issue list
 			issueList.Clear()
+			indexToIssue = make(map[int]*parser.Issue)
+			currentIndex := 0
 
 			// Add ready issues
 			readyIssues := appState.GetReadyIssues()
 			if len(readyIssues) > 0 {
 				issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+				currentIndex++
+
 				for _, issue := range readyIssues {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
 				}
 			}
 
@@ -85,11 +94,15 @@ func main() {
 			blockedIssues := appState.GetBlockedIssues()
 			if len(blockedIssues) > 0 {
 				issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
+				currentIndex++
+
 				for _, issue := range blockedIssues {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
 				}
 			}
 
@@ -97,11 +110,15 @@ func main() {
 			inProgressIssues := appState.GetInProgressIssues()
 			if len(inProgressIssues) > 0 {
 				issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+				currentIndex++
+
 				for _, issue := range inProgressIssues {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
 				}
 			}
 		})
@@ -128,7 +145,22 @@ func main() {
 		SetScrollable(true).
 		SetWrap(true)
 	detailPanel.SetBorder(true).SetTitle("Details")
-	detailPanel.SetText("[yellow]Select an issue to view details[-]")
+	detailPanel.SetText("[yellow]Select an issue and press Enter to view details[-]")
+
+	// Function to show issue details
+	showIssueDetails := func(issue *parser.Issue) {
+		details := formatIssueDetails(issue)
+		detailPanel.SetText(details)
+		detailPanel.ScrollToBeginning()
+	}
+
+	// Set up selection handler for issue list
+	issueList.SetSelectedFunc(func(index int, mainText, secondaryText string, shortcut rune) {
+		// Check if the selected item is an issue (not a header)
+		if issue, ok := indexToIssue[index]; ok {
+			showIssueDetails(issue)
+		}
+	})
 
 	// Layout
 	flex := tview.NewFlex().
@@ -204,6 +236,151 @@ func getPriorityColor(priority int) string {
 		return "gray"
 	case 4:
 		return "darkgray"
+	default:
+		return "white"
+	}
+}
+
+// formatIssueDetails formats full issue metadata for display
+func formatIssueDetails(issue *parser.Issue) string {
+	var result string
+
+	// Header
+	priorityColor := getPriorityColor(issue.Priority)
+	statusColor := getStatusColor(issue.Status)
+	typeIcon := getTypeIcon(issue.IssueType)
+
+	result += fmt.Sprintf("[::b]%s %s[-::-]\n", typeIcon, issue.Title)
+	result += fmt.Sprintf("[gray]ID:[-] %s  ", issue.ID)
+	result += fmt.Sprintf("[%s]P%d[-]  ", priorityColor, issue.Priority)
+	result += fmt.Sprintf("[%s]%s[-]\n\n", statusColor, issue.Status)
+
+	// Description
+	if issue.Description != "" {
+		result += "[yellow::b]Description:[-::-]\n"
+		result += issue.Description + "\n\n"
+	}
+
+	// Design notes
+	if issue.Design != "" {
+		result += "[yellow::b]Design:[-::-]\n"
+		result += issue.Design + "\n\n"
+	}
+
+	// Acceptance criteria
+	if issue.AcceptanceCriteria != "" {
+		result += "[yellow::b]Acceptance Criteria:[-::-]\n"
+		result += issue.AcceptanceCriteria + "\n\n"
+	}
+
+	// Notes
+	if issue.Notes != "" {
+		result += "[yellow::b]Notes:[-::-]\n"
+		result += issue.Notes + "\n\n"
+	}
+
+	// Dependencies
+	if len(issue.Dependencies) > 0 {
+		result += "[yellow::b]Dependencies:[-::-]\n"
+		for _, dep := range issue.Dependencies {
+			result += fmt.Sprintf("  • [%s]%s[-] %s\n",
+				getDependencyColor(dep.Type), dep.Type, dep.DependsOnID)
+		}
+		result += "\n"
+	}
+
+	// Labels
+	if len(issue.Labels) > 0 {
+		result += "[yellow::b]Labels:[-::-] "
+		for i, label := range issue.Labels {
+			if i > 0 {
+				result += ", "
+			}
+			result += fmt.Sprintf("[cyan]%s[-]", label)
+		}
+		result += "\n\n"
+	}
+
+	// Metadata
+	result += "[yellow::b]Metadata:[-::-]\n"
+	result += fmt.Sprintf("  Created: %s\n", issue.CreatedAt.Format("2006-01-02 15:04"))
+	result += fmt.Sprintf("  Updated: %s\n", issue.UpdatedAt.Format("2006-01-02 15:04"))
+
+	if issue.ClosedAt != nil {
+		result += fmt.Sprintf("  Closed: %s\n", issue.ClosedAt.Format("2006-01-02 15:04"))
+	}
+
+	if issue.Assignee != "" {
+		result += fmt.Sprintf("  Assignee: %s\n", issue.Assignee)
+	}
+
+	if issue.EstimatedMinutes != nil {
+		hours := *issue.EstimatedMinutes / 60
+		mins := *issue.EstimatedMinutes % 60
+		result += fmt.Sprintf("  Estimated: %dh %dm\n", hours, mins)
+	}
+
+	if issue.ExternalRef != nil {
+		result += fmt.Sprintf("  External Ref: %s\n", *issue.ExternalRef)
+	}
+
+	// Comments
+	if len(issue.Comments) > 0 {
+		result += "\n[yellow::b]Comments:[-::-]\n"
+		for _, comment := range issue.Comments {
+			result += fmt.Sprintf("  [cyan]%s[-] (%s):\n", comment.Author, comment.CreatedAt.Format("2006-01-02 15:04"))
+			result += fmt.Sprintf("    %s\n", comment.Text)
+		}
+	}
+
+	return result
+}
+
+// getStatusColor returns color for status
+func getStatusColor(status parser.Status) string {
+	switch status {
+	case parser.StatusOpen:
+		return "green"
+	case parser.StatusInProgress:
+		return "blue"
+	case parser.StatusBlocked:
+		return "yellow"
+	case parser.StatusClosed:
+		return "gray"
+	default:
+		return "white"
+	}
+}
+
+// getTypeIcon returns icon for issue type
+func getTypeIcon(issueType parser.IssueType) string {
+	switch issueType {
+	case parser.TypeBug:
+		return "🐛"
+	case parser.TypeFeature:
+		return "✨"
+	case parser.TypeTask:
+		return "📋"
+	case parser.TypeEpic:
+		return "🎯"
+	case parser.TypeChore:
+		return "🔧"
+	default:
+		return "•"
+	}
+}
+
+// getDependencyColor returns color for dependency type
+func getDependencyColor(depType parser.DependencyType) string {
+	switch depType {
+	case parser.DepBlocks:
+		return "red"
+	case parser.DepRelated:
+		return "blue"
+	case parser.DepParentChild:
+		return "green"
+	case parser.DepDiscoveredFrom:
+		return "yellow"
 	default:
 		return "white"
 	}
