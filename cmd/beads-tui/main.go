@@ -8,7 +8,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/andy/beads-tui/internal/parser"
@@ -280,8 +282,15 @@ func main() {
 	}
 
 	// Function to load and display issues (for async updates after app starts)
-	refreshIssues := func() {
+	// preserveIssueID: if provided, attempt to restore selection to this issue after refresh
+	refreshIssues := func(preserveIssueID ...string) {
 		log.Printf("REFRESH: Starting issue refresh")
+		var targetIssueID string
+		if len(preserveIssueID) > 0 {
+			targetIssueID = preserveIssueID[0]
+			log.Printf("REFRESH: Will attempt to preserve selection on issue: %s", targetIssueID)
+		}
+
 		// Load issues from SQLite with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -310,6 +319,19 @@ func main() {
 			statusBar.SetText(getStatusBarText())
 
 			populateIssueList()
+
+			// Restore selection if requested
+			if targetIssueID != "" {
+				log.Printf("REFRESH: Searching for issue %s to restore selection", targetIssueID)
+				for idx, issue := range indexToIssue {
+					if issue.ID == targetIssueID {
+						log.Printf("REFRESH: Found issue %s at index %d, restoring selection", targetIssueID, idx)
+						issueList.SetCurrentItem(idx)
+						break
+					}
+				}
+			}
+
 			log.Printf("REFRESH: UI update complete")
 		})
 		log.Printf("REFRESH: Issue refresh complete")
@@ -440,6 +462,40 @@ func main() {
 	// Pages for modal dialogs
 	pages := tview.NewPages().
 		AddPage("main", flex, true, true)
+
+	// Set up signal handler for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Run signal handler in goroutine
+	go func() {
+		sig := <-sigChan
+		log.Printf("SIGNAL: Received signal %v, initiating graceful shutdown", sig)
+
+		// Stop the TUI application
+		app.Stop()
+
+		// Give deferred cleanup functions time to execute
+		// If they don't complete within 5 seconds, force exit
+		cleanupDone := make(chan struct{})
+		go func() {
+			// This will be reached after app.Stop() returns and we're back in the main goroutine
+			time.Sleep(100 * time.Millisecond) // Small delay to allow main() to return
+			close(cleanupDone)
+		}()
+
+		select {
+		case <-cleanupDone:
+			log.Printf("SIGNAL: Graceful shutdown complete")
+		case <-time.After(5 * time.Second):
+			log.Printf("SIGNAL: Shutdown timeout, forcing exit")
+			if logFile != nil {
+				logFile.Sync()
+				logFile.Close()
+			}
+			os.Exit(1)
+		}
+	}()
 
 	// Helper function to perform search
 	performSearch := func(query string) {
@@ -711,6 +767,24 @@ func main() {
 [cyan::b]General[-::-]
   ?           Show this help screen
   q           Quit
+
+[cyan::b]Status Icons[-::-]
+  ●           Open/Ready
+  ○           Blocked
+  ◆           In Progress
+  ·           Other
+
+[cyan::b]Priority Colors[-::-]
+  [red]P0[-]          Critical
+  [orange]P1[-]          High
+  P2          Normal (white)
+  [gray]P3[-]          Low
+  [darkgray]P4[-]          Lowest
+
+[cyan::b]Status Colors[-::-]
+  [green]●[-]           Ready
+  [yellow]○[-]           Blocked
+  [blue]◆[-]           In Progress
 
 [gray]Press ESC or ? to close this help screen[-]`
 
@@ -1022,21 +1096,22 @@ func main() {
 				// Quick priority change
 				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
 					priority := int(event.Rune() - '0')
+					issueID := issue.ID // Capture issue ID before refresh
 					// Update priority via bd command
-					cmd := fmt.Sprintf("bd update %s --priority %d", issue.ID, priority)
+					cmd := fmt.Sprintf("bd update %s --priority %d", issueID, priority)
 					log.Printf("BD COMMAND: Executing priority update: %s", cmd)
 					err := exec.Command("sh", "-c", cmd).Run()
 					if err != nil {
 						log.Printf("BD COMMAND ERROR: Priority update failed: %v", err)
 						statusBar.SetText(fmt.Sprintf("[red]Error updating priority: %v[-]", err))
 					} else {
-						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", issue.ID, priority)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", issue.ID, priority))
-						// Refresh issues after a short delay
+						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", issueID, priority)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", issueID, priority))
+						// Refresh issues after a short delay, preserving selection
 						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
 						time.AfterFunc(500*time.Millisecond, func() {
 							log.Printf("BD COMMAND: Delayed refresh starting")
-							refreshIssues()
+							refreshIssues(issueID)
 						})
 					}
 				}
@@ -1044,6 +1119,7 @@ func main() {
 			case 's':
 				// Toggle status
 				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					issueID := issue.ID // Capture issue ID before refresh
 					// Cycle through statuses: open -> in_progress -> blocked -> closed -> open
 					var newStatus string
 					switch issue.Status {
@@ -1059,20 +1135,20 @@ func main() {
 						newStatus = "in_progress"
 					}
 					// Update status via bd command
-					cmd := fmt.Sprintf("bd update %s --status %s", issue.ID, newStatus)
+					cmd := fmt.Sprintf("bd update %s --status %s", issueID, newStatus)
 					log.Printf("BD COMMAND: Executing status update: %s", cmd)
 					err := exec.Command("sh", "-c", cmd).Run()
 					if err != nil {
 						log.Printf("BD COMMAND ERROR: Status update failed: %v", err)
 						statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
 					} else {
-						log.Printf("BD COMMAND: Status update successful for %s -> %s", issue.ID, newStatus)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issue.ID, newStatus))
-						// Refresh issues after a short delay
+						log.Printf("BD COMMAND: Status update successful for %s -> %s", issueID, newStatus)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issueID, newStatus))
+						// Refresh issues after a short delay, preserving selection
 						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
 						time.AfterFunc(500*time.Millisecond, func() {
 							log.Printf("BD COMMAND: Delayed refresh starting")
-							refreshIssues()
+							refreshIssues(issueID)
 						})
 					}
 				}
