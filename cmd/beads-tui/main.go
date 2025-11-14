@@ -184,6 +184,18 @@ func main() {
 		text := fmt.Sprintf("%s%s[%s]%s[-] [%s]%s[-] [P%d] %s",
 			prefix, branch, statusColor, statusIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
 
+		// Add labels if present
+		if len(issue.Labels) > 0 {
+			text += " [darkgray]["
+			for i, label := range issue.Labels {
+				if i > 0 {
+					text += ", "
+				}
+				text += label
+			}
+			text += "][-]"
+		}
+
 		issueList.AddItem(text, "", 0, nil)
 		indexToIssue[*currentIndex] = issue
 		*currentIndex++
@@ -226,6 +238,17 @@ func main() {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [darkgray]["
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += ", "
+							}
+							text += label
+						}
+						text += "][-]"
+					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
 					currentIndex++
@@ -242,6 +265,17 @@ func main() {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [darkgray]["
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += ", "
+							}
+							text += label
+						}
+						text += "][-]"
+					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
 					currentIndex++
@@ -258,6 +292,17 @@ func main() {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [darkgray]["
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += ", "
+							}
+							text += label
+						}
+						text += "][-]"
+					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
 					currentIndex++
@@ -274,6 +319,17 @@ func main() {
 					priorityColor := getPriorityColor(issue.Priority)
 					text := fmt.Sprintf("  [%s]✓[-] %s [P%d] %s",
 						priorityColor, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [darkgray]["
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += ", "
+							}
+							text += label
+						}
+						text += "][-]"
+					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
 					currentIndex++
