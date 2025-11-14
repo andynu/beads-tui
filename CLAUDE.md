@@ -51,6 +51,45 @@ bd export -o .beads/issues.jsonl
 
 **Note:** The beads daemon uses a 30-second debounce before auto-exporting. If the TUI shows no issues immediately after creating them, either wait ~30 seconds or run `bd export` manually.
 
+### Debug Logging
+
+The TUI includes comprehensive diagnostic logging to help diagnose hangs and performance issues:
+
+```bash
+# Run with debug logging enabled
+./beads-tui --debug
+
+# Log file location
+~/.beads-tui/debug-YYYY-MM-DD-HH-MM-SS.log
+```
+
+**What gets logged:**
+- All keyboard input events (key, rune, modifiers, current mode)
+- Issue refresh operations (start, database load, UI update, completion)
+- bd command executions (priority/status changes)
+- File watcher events (changes detected, refresh triggers)
+- Application lifecycle (startup, shutdown, errors)
+- Timestamps with microsecond precision
+- Source file and line numbers
+
+**Use cases:**
+- **TUI hangs**: Examine log to see last keyboard event and any stuck operations
+- **Performance issues**: Check refresh timing and database load duration
+- **Command failures**: See exact bd commands executed and error messages
+- **Watcher problems**: Verify file changes are detected
+
+**Example log output:**
+```
+2025/11/14 09:45:23.123456 main.go:42: === beads-tui started in debug mode ===
+2025/11/14 09:45:23.234567 main.go:53: Finding .beads directory
+2025/11/14 09:45:23.345678 main.go:301: Setting up file watcher on: /path/.beads/beads.db
+2025/11/14 09:45:23.456789 main.go:315: WATCHER: File watcher started successfully
+2025/11/14 09:45:30.123456 main.go:412: KEY EVENT: key=Rune rune='j' mod=0 searchMode=false detailFocus=false
+2025/11/14 09:45:31.234567 main.go:412: KEY EVENT: key=Rune rune='1' mod=0 searchMode=false detailFocus=false
+2025/11/14 09:45:31.345678 main.go:577: BD COMMAND: Executing priority update: bd update tui-123 --priority 1
+2025/11/14 09:45:31.456789 main.go:583: BD COMMAND: Priority update successful for tui-123 -> P1
+```
+
 ### Testing Considerations
 
 **CRITICAL:** Never pollute the production `.beads/beads.db` with test data. When manually testing, use:
@@ -100,6 +139,29 @@ beads-tui/
 - **List View (default):** Issues grouped by status (ready/blocked/in-progress)
 - **Tree View:** Issues displayed as dependency hierarchy with ASCII tree characters
 - Toggle between modes with the 't' key
+
+**Panel focus system:** The TUI has two focusable panels (issue list and detail panel):
+- **Default:** Issue list is focused (for navigation)
+- **Tab or Enter:** Focus detail panel to enable keyboard scrolling
+- **ESC:** Return focus to issue list
+- **Visual indicators:** Focused panel has yellow border and updated title text
+- **Status bar:** Shows current focus (List or Details)
+
+**Quick issue updates:** Issues can be updated directly from the TUI without leaving the interface:
+- **Priority changes:** Press `0`-`4` to instantly set priority (P0=critical, P1=high, P2=normal, P3=low, P4=lowest)
+- **Status cycling:** Press `s` to cycle through statuses (open → in_progress → blocked → closed → open)
+- **Immediate feedback:** Confirmation message shown in status bar with green checkmark
+- **Auto-refresh:** Issue list automatically refreshes 500ms after update to show changes
+- **No dialogs:** Updates are instant with single keypress, no confirmation needed
+
+**Issue creation dialog:** Create new issues directly from the TUI with the `a` key (tui-ywv.6):
+- **Modal form:** Centered dialog with title, description, priority, type fields
+- **Smart defaults:** Pre-selects P2 priority and feature type
+- **Parent relationship:** Optional checkbox to add as child of currently selected issue
+- **Form navigation:** Tab between fields, Enter/Ctrl-S to submit, ESC to cancel
+- **Validation:** Requires title before allowing creation
+- **Command execution:** Executes `bd create` command with form data
+- **Auto-refresh:** Issue list refreshes 500ms after creation to show new issue
 
 ### Package Responsibilities
 
@@ -222,17 +284,35 @@ DEPENDENCY TREE
 ### Changing Keybindings
 
 Update `app.SetInputCapture()` in `cmd/beads-tui/main.go`. Current bindings:
+
+**Issue List Mode:**
 - `q`: Quit
 - `r`: Manual refresh
 - `j`: Down (simulates arrow key)
 - `k`: Up (simulates arrow key)
 - `t`: Toggle between list and tree view
+- `m`: Toggle mouse mode on/off
+- `a`: Open issue creation dialog (vim-style "add")
+- `0`-`4`: Quick priority change (set current issue to P0-P4)
+- `s`: Toggle status (cycles: open → in_progress → blocked → closed → open)
 - `g` + `g`: Jump to top
 - `G`: Jump to bottom
 - `/`: Start search mode
 - `n`: Next search result
 - `N`: Previous search result
-- `Enter`: Handled by tview list (selection)
+- `Tab`: Focus detail panel for scrolling
+- `Enter`: Focus detail panel (when on an issue)
+
+**Detail Panel Mode (when focused):**
+- `ESC`: Return focus to issue list
+- `Ctrl-d`: Scroll down half page (vim style)
+- `Ctrl-u`: Scroll up half page (vim style)
+- `Ctrl-e`: Scroll down one line (vim style)
+- `Ctrl-y`: Scroll up one line (vim style)
+- `PageDown`: Scroll down full page
+- `PageUp`: Scroll up full page
+- `Home`: Jump to top of details
+- `End`: Jump to bottom of details
 
 ### Debugging Watcher Issues
 
