@@ -1,8 +1,8 @@
 # Reference copy of beads source (not for runtime use)
 beads/
 
-# Binaries
-beads-tui
+# Binaries (root level only, not cmd/beads-tui directory)
+/beads-tui
 *.exe
 *.exe~
 *.dll
