@@ -1152,7 +1152,8 @@ func main() {
   Tf          Set type to feature
   Tb          Set type to bug
   Tt          Set type to task
-  Td          Set type to doc
+  Te          Set type to epic
+  Td          Set type to chore (doc/maintenance)
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
@@ -2267,7 +2268,7 @@ func main() {
 				// First 't' press - mark for potential two-character shortcut
 				lastKeyWasT = true
 				lastKeyWasS = false
-				statusBar.SetText("[yellow]Type shortcut: f/b/t/d[-]")
+				statusBar.SetText("[yellow]Type shortcut: f/b/t/e/d (chore)[-]")
 				// Reset after 2 seconds if no second key
 				time.AfterFunc(2*time.Second, func() {
 					app.QueueUpdateDraw(func() {
@@ -2295,6 +2296,25 @@ func main() {
 				showCreateIssueDialog()
 				return nil
 			case 'e':
+				// Handle two-character type shortcut: Te (epic)
+				if lastKeyWasT {
+					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+						issueID := issue.ID
+						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "epic")
+						log.Printf("BD COMMAND: Executing type update (Te): %s", cmd)
+						err := exec.Command("sh", "-c", cmd).Run()
+						if err != nil {
+							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
+						} else {
+							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to epic[-]", issueID))
+							time.AfterFunc(500*time.Millisecond, func() {
+								refreshIssues(issueID)
+							})
+						}
+					}
+					lastKeyWasT = false
+					return nil
+				}
 				// Open edit form for current issue
 				showEditForm()
 				return nil
@@ -2405,17 +2425,17 @@ func main() {
 				showQuickFilter()
 				return nil
 			case 'd':
-				// Handle two-character type shortcut: Td (doc)
+				// Handle two-character type shortcut: Td (chore - documentation/chore work)
 				if lastKeyWasT {
 					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
 						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "doc")
+						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "chore")
 						log.Printf("BD COMMAND: Executing type update (Td): %s", cmd)
 						err := exec.Command("sh", "-c", cmd).Run()
 						if err != nil {
 							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
 						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to doc[-]", issueID))
+							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to chore[-]", issueID))
 							time.AfterFunc(500*time.Millisecond, func() {
 								refreshIssues(issueID)
 							})
