@@ -815,6 +815,8 @@ func main() {
   a           Create new issue (vim-style "add")
   c           Add comment to selected issue
   e           Edit issue fields (description, design, acceptance, notes) in $EDITOR
+  x           Close issue with optional reason
+  X           Reopen closed issue with optional reason
   D           Manage dependencies (add/remove blocks, parent-child, related)
   L           Manage labels (add/remove labels)
   y           Yank (copy) issue ID to clipboard
@@ -1250,6 +1252,198 @@ func main() {
 			AddItem(nil, 0, 1, false)
 
 		pages.AddPage("label_dialog", modal, true, true)
+		app.SetFocus(form)
+	}
+
+	// Helper function to close issue with optional reason
+	showCloseIssueDialog := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		// Don't allow closing already closed issues
+		if issue.Status == parser.StatusClosed {
+			statusBar.SetText("[yellow]Issue is already closed[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		var reason string
+
+		form.AddTextView("Closing", issue.ID+" - "+issue.Title, 0, 2, false, false)
+		form.AddInputField("Reason (optional)", "", 60, nil, func(text string) {
+			reason = text
+		})
+
+		form.AddButton("Close Issue", func() {
+			issueID := issue.ID // Capture before potential refresh
+			cmd := fmt.Sprintf("bd close %s", issueID)
+			if reason != "" {
+				cmd += fmt.Sprintf(" --reason %q", reason)
+			}
+			log.Printf("BD COMMAND: Closing issue: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Close failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Issue closed successfully")
+				statusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", issueID))
+				pages.RemovePage("close_issue_dialog")
+				app.SetFocus(issueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("close_issue_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Close Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("close_issue_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Add Enter key handler to close
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEnter {
+				issueID := issue.ID
+				cmd := fmt.Sprintf("bd close %s", issueID)
+				if reason != "" {
+					cmd += fmt.Sprintf(" --reason %q", reason)
+				}
+				log.Printf("BD COMMAND: Closing issue (Enter): %s", cmd)
+				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				if err != nil {
+					log.Printf("BD COMMAND ERROR: Close failed: %v, output: %s", err, string(output))
+					statusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
+				} else {
+					log.Printf("BD COMMAND: Issue closed successfully")
+					statusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", issueID))
+					pages.RemovePage("close_issue_dialog")
+					app.SetFocus(issueList)
+					time.AfterFunc(500*time.Millisecond, func() {
+						refreshIssues(issueID)
+					})
+				}
+				return nil
+			}
+			return event
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 2, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("close_issue_dialog", modal, true, true)
+		app.SetFocus(form)
+	}
+
+	// Helper function to reopen closed issue with optional reason
+	showReopenIssueDialog := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		// Only allow reopening closed issues
+		if issue.Status != parser.StatusClosed {
+			statusBar.SetText("[yellow]Issue is not closed[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		var reason string
+
+		form.AddTextView("Reopening", issue.ID+" - "+issue.Title, 0, 2, false, false)
+		form.AddInputField("Reason (optional)", "", 60, nil, func(text string) {
+			reason = text
+		})
+
+		form.AddButton("Reopen Issue", func() {
+			issueID := issue.ID // Capture before potential refresh
+			cmd := fmt.Sprintf("bd reopen %s", issueID)
+			if reason != "" {
+				cmd += fmt.Sprintf(" --reason %q", reason)
+			}
+			log.Printf("BD COMMAND: Reopening issue: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Reopen failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Issue reopened successfully")
+				statusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", issueID))
+				pages.RemovePage("reopen_issue_dialog")
+				app.SetFocus(issueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("reopen_issue_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Reopen Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("reopen_issue_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Add Enter key handler to reopen
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEnter {
+				issueID := issue.ID
+				cmd := fmt.Sprintf("bd reopen %s", issueID)
+				if reason != "" {
+					cmd += fmt.Sprintf(" --reason %q", reason)
+				}
+				log.Printf("BD COMMAND: Reopening issue (Enter): %s", cmd)
+				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				if err != nil {
+					log.Printf("BD COMMAND ERROR: Reopen failed: %v, output: %s", err, string(output))
+					statusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
+				} else {
+					log.Printf("BD COMMAND: Issue reopened successfully")
+					statusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", issueID))
+					pages.RemovePage("reopen_issue_dialog")
+					app.SetFocus(issueList)
+					time.AfterFunc(500*time.Millisecond, func() {
+						refreshIssues(issueID)
+					})
+				}
+				return nil
+			}
+			return event
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 2, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("reopen_issue_dialog", modal, true, true)
 		app.SetFocus(form)
 	}
 
@@ -1813,6 +2007,14 @@ func main() {
 						})
 					}
 				}
+				return nil
+			case 'x':
+				// Close issue with optional reason
+				showCloseIssueDialog()
+				return nil
+			case 'X':
+				// Reopen closed issue with optional reason
+				showReopenIssueDialog()
 				return nil
 			case '?':
 				// Show help screen
