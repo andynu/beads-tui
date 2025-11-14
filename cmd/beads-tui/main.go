@@ -236,8 +236,9 @@ func main() {
 
 				for _, issue := range readyIssues {
 					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
+					typeIcon := getTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]●[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
 						text += " [gray]"
@@ -263,8 +264,9 @@ func main() {
 
 				for _, issue := range blockedIssues {
 					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
+					typeIcon := getTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]○[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
 						text += " [gray]"
@@ -290,8 +292,9 @@ func main() {
 
 				for _, issue := range inProgressIssues {
 					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
+					typeIcon := getTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]◆[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
 						text += " [gray]"
@@ -317,8 +320,9 @@ func main() {
 
 				for _, issue := range closedIssues {
 					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]✓[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
+					typeIcon := getTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]✓[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
 						text += " [gray]"
