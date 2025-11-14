@@ -1389,6 +1389,48 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
+		// Add Ctrl-Enter handler to submit form
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlJ || (event.Key() == tcell.KeyEnter && event.Modifiers()&tcell.ModCtrl != 0) {
+				// Ctrl-Enter pressed - submit form
+				if title == "" {
+					statusBar.SetText("[red]Error: Title is required[-]")
+					return nil
+				}
+
+				// Build bd create command
+				cmd := fmt.Sprintf("bd create %q -p %s -t %s", title, priority, issueType)
+				if description != "" {
+					cmd += fmt.Sprintf(" --description %q", description)
+				}
+
+				// Check if we should add parent relationship
+				if currentIssueID != "" {
+					formItem := form.GetFormItemByLabel("Add as child of " + currentIssueID)
+					if checkbox, ok := formItem.(*tview.Checkbox); ok && checkbox.IsChecked() {
+						cmd += fmt.Sprintf(" --parent %s", currentIssueID)
+					}
+				}
+
+				log.Printf("BD COMMAND: Creating issue (Ctrl-Enter): %s", cmd)
+				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				if err != nil {
+					log.Printf("BD COMMAND ERROR: Issue creation failed: %v, output: %s", err, string(output))
+					statusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
+				} else {
+					log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
+					statusBar.SetText("[green]✓ Issue created successfully[-]")
+					pages.RemovePage("create_issue")
+					app.SetFocus(issueList)
+					time.AfterFunc(500*time.Millisecond, func() {
+						refreshIssues()
+					})
+				}
+				return nil
+			}
+			return event
+		})
+
 		// Create modal (centered)
 		modal := tview.NewFlex().
 			AddItem(nil, 0, 1, false).
