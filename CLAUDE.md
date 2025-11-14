@@ -39,8 +39,21 @@ bd list
 # View dependency tree
 bd dep tree
 
+# Show issue details (metadata only)
+bd show <issue-id>
+
+# Show issue comments (separate command!)
+bd comments <issue-id>
+
+# IMPORTANT: Always check BOTH when examining an issue
+# bd show does NOT include comments - you must run bd comments separately
+
 # Create new issue
 bd create "Issue title" -p 1 -t feature
+
+# Add a comment to an issue
+bd comment <issue-id> "Your comment text"
+# Or: bd comments add <issue-id> "Your comment text"
 
 # Update issue status
 bd update <issue-id> --status in_progress
