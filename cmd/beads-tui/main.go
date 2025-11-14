@@ -1306,6 +1306,82 @@ func main() {
 	}
 
 	// Helper function to show issue creation dialog
+	// Helper function to detect priority from text (natural language)
+	detectPriority := func(text string) *int {
+		lower := strings.ToLower(text)
+		// P0 keywords: critical, urgent, blocking, blocker, emergency, outage, down, broken
+		if strings.Contains(lower, "critical") || strings.Contains(lower, "urgent") ||
+			strings.Contains(lower, "blocking") || strings.Contains(lower, "blocker") ||
+			strings.Contains(lower, "emergency") || strings.Contains(lower, "outage") ||
+			strings.Contains(lower, "down") || strings.Contains(lower, "broken") {
+			p := 0
+			return &p
+		}
+		// P1 keywords: important, high priority, asap, soon, needed
+		if strings.Contains(lower, "important") || strings.Contains(lower, "high priority") ||
+			strings.Contains(lower, "asap") || strings.Contains(lower, "soon") ||
+			strings.Contains(lower, "needed") || strings.Contains(lower, "must have") {
+			p := 1
+			return &p
+		}
+		// P3 keywords: low priority, minor, nice to have, eventually, someday
+		if strings.Contains(lower, "low priority") || strings.Contains(lower, "minor") ||
+			strings.Contains(lower, "nice to have") || strings.Contains(lower, "eventually") ||
+			strings.Contains(lower, "someday") || strings.Contains(lower, "polish") {
+			p := 3
+			return &p
+		}
+		// P4 keywords: trivial, cosmetic, optional
+		if strings.Contains(lower, "trivial") || strings.Contains(lower, "cosmetic") ||
+			strings.Contains(lower, "optional") {
+			p := 4
+			return &p
+		}
+		return nil // No match, keep default
+	}
+
+	// Helper function to detect issue type from text (natural language)
+	detectIssueType := func(text string) *string {
+		lower := strings.ToLower(text)
+		// Bug keywords: bug, error, crash, fix, broken, issue, problem, regression
+		if strings.Contains(lower, "bug") || strings.Contains(lower, "error") ||
+			strings.Contains(lower, "crash") || strings.Contains(lower, "fix ") ||
+			strings.Contains(lower, "broken") || strings.Contains(lower, "problem") ||
+			strings.Contains(lower, "regression") {
+			t := "bug"
+			return &t
+		}
+		// Epic keywords: epic, project, initiative, milestone (check before task)
+		if strings.Contains(lower, "epic") || strings.Contains(lower, "project") ||
+			strings.Contains(lower, "initiative") || strings.Contains(lower, "milestone") {
+			t := "epic"
+			return &t
+		}
+		// Chore keywords: chore, maintenance, dependency, upgrade, cleanup (check before task)
+		if strings.Contains(lower, "chore") || strings.Contains(lower, "maintenance") ||
+			strings.Contains(lower, "dependency") || strings.Contains(lower, "upgrade") ||
+			strings.Contains(lower, "cleanup") {
+			t := "chore"
+			return &t
+		}
+		// Task keywords: task, do, implement, update, change, refactor, clean up
+		if strings.Contains(lower, "task") || strings.Contains(lower, "do ") ||
+			strings.Contains(lower, "implement") || strings.Contains(lower, "update") ||
+			strings.Contains(lower, "change") || strings.Contains(lower, "refactor") ||
+			strings.Contains(lower, "clean up") {
+			t := "task"
+			return &t
+		}
+		// Feature is default, so only explicitly detect if keywords present
+		if strings.Contains(lower, "feature") || strings.Contains(lower, "add ") ||
+			strings.Contains(lower, "new ") || strings.Contains(lower, "build") ||
+			strings.Contains(lower, "create") {
+			t := "feature"
+			return &t
+		}
+		return nil // No match, keep default
+	}
+
 	showCreateIssueDialog := func() {
 		// Create form
 		form := tview.NewForm()
@@ -1313,6 +1389,8 @@ func main() {
 		var title, description, priority, issueType string
 		priority = "2" // Default to P2
 		issueType = "feature" // Default to feature
+		priorityExplicitlySet := false // Track if user manually changed priority
+		typeExplicitlySet := false // Track if user manually changed type
 
 		// Get current issue for potential parent
 		var currentIssueID string
@@ -1320,18 +1398,75 @@ func main() {
 			currentIssueID = issue.ID
 		}
 
+		// Create a TextView to show detected keywords
+		detectionHintView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetTextAlign(tview.AlignLeft)
+
+		// Helper to update priority/type from text if not explicitly set
+		updateFromText := func() {
+			combinedText := title + " " + description
+			var hints []string
+
+			if !priorityExplicitlySet {
+				if detectedP := detectPriority(combinedText); detectedP != nil {
+					priority = fmt.Sprintf("%d", *detectedP)
+					// Update dropdown to reflect detected priority
+					if dropdown := form.GetFormItemByLabel("Priority"); dropdown != nil {
+						if dd, ok := dropdown.(*tview.DropDown); ok {
+							dd.SetCurrentOption(*detectedP)
+						}
+					}
+					// Add hint
+					priorityNames := []string{"P0 (Critical)", "P1 (High)", "P2 (Normal)", "P3 (Low)", "P4 (Lowest)"}
+					hints = append(hints, fmt.Sprintf("[yellow]Priority:[white] Auto-detected %s", priorityNames[*detectedP]))
+				}
+			}
+
+			if !typeExplicitlySet {
+				if detectedT := detectIssueType(combinedText); detectedT != nil {
+					issueType = *detectedT
+					// Update dropdown to reflect detected type
+					if dropdown := form.GetFormItemByLabel("Type"); dropdown != nil {
+						if dd, ok := dropdown.(*tview.DropDown); ok {
+							typeOptions := []string{"bug", "feature", "task", "epic", "chore"}
+							for i, opt := range typeOptions {
+								if opt == issueType {
+									dd.SetCurrentOption(i)
+									break
+								}
+							}
+						}
+					}
+					// Add hint
+					hints = append(hints, fmt.Sprintf("[yellow]Type:[white] Auto-detected %s", *detectedT))
+				}
+			}
+
+			// Update hint view
+			if len(hints) > 0 {
+				detectionHintView.SetText("[gray]" + strings.Join(hints, " | ") + "[-]")
+			} else {
+				detectionHintView.SetText("")
+			}
+		}
+
 		// Add form fields
 		form.AddInputField("Title", "", 50, nil, func(text string) {
 			title = text
+			updateFromText()
 		})
 		form.AddTextArea("Description", "", 60, 5, 0, func(text string) {
 			description = text
+			updateFromText()
 		})
 		form.AddDropDown("Priority", []string{"P0 (Critical)", "P1 (High)", "P2 (Normal)", "P3 (Low)", "P4 (Lowest)"}, 2, func(option string, index int) {
 			priority = fmt.Sprintf("%d", index)
+			priorityExplicitlySet = true
 		})
 		form.AddDropDown("Type", []string{"bug", "feature", "task", "epic", "chore"}, 1, func(option string, index int) {
 			issueType = option
+			typeExplicitlySet = true
 		})
 		if currentIssueID != "" {
 			form.AddCheckbox("Add as child of "+currentIssueID, false, nil)
@@ -1431,12 +1566,16 @@ func main() {
 			return event
 		})
 
-		// Create modal (centered)
+		// Create modal with hint view (centered)
+		formWithHints := tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(form, 0, 1, true).
+			AddItem(detectionHintView, 1, 0, false)
+
 		modal := tview.NewFlex().
 			AddItem(nil, 0, 1, false).
 			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 				AddItem(nil, 0, 1, false).
-				AddItem(form, 0, 3, true).
+				AddItem(formWithHints, 0, 3, true).
 				AddItem(nil, 0, 1, false), 0, 3, true).
 			AddItem(nil, 0, 1, false)
 
