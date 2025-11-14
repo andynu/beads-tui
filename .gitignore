@@ -1,0 +1,38 @@
+# Reference copy of beads source (not for runtime use)
+beads/
+
+# Binaries
+beads-tui
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Build artifacts
+dist/
+build/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Beads database (gitignored by beads itself)
+.beads/beads.db
+.beads/bd.sock
+.beads/*.log
