@@ -850,6 +850,138 @@ func main() {
 		app.SetFocus(form)
 	}
 
+	// Helper function to show stats dashboard
+	showStatsOverlay := func() {
+		allIssues := appState.GetAllIssues()
+
+		// Calculate statistics
+		stats := struct {
+			total        int
+			byStatus     map[parser.Status]int
+			byPriority   map[int]int
+			byType       map[parser.IssueType]int
+			totalDeps    int
+			avgDepsPerIssue float64
+		}{
+			byStatus:   make(map[parser.Status]int),
+			byPriority: make(map[int]int),
+			byType:     make(map[parser.IssueType]int),
+		}
+
+		stats.total = len(allIssues)
+		totalDeps := 0
+
+		for _, issue := range allIssues {
+			stats.byStatus[issue.Status]++
+			stats.byPriority[issue.Priority]++
+			stats.byType[issue.IssueType]++
+			totalDeps += len(issue.Dependencies)
+		}
+
+		stats.totalDeps = totalDeps
+		if stats.total > 0 {
+			stats.avgDepsPerIssue = float64(totalDeps) / float64(stats.total)
+		}
+
+		// Build stats text
+		var sb strings.Builder
+		sb.WriteString("[yellow::b]Issue Statistics Dashboard[-::-]\n\n")
+
+		// Overall stats
+		sb.WriteString(fmt.Sprintf("[cyan::b]Total Issues:[-::-] %d\n\n", stats.total))
+
+		// By Status
+		sb.WriteString("[cyan::b]By Status:[-::-]\n")
+		sb.WriteString(fmt.Sprintf("  [limegreen]Ready[-]:        %3d  (%.1f%%)\n",
+			stats.byStatus[parser.StatusOpen],
+			float64(stats.byStatus[parser.StatusOpen])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [deepskyblue]In Progress[-]: %3d  (%.1f%%)\n",
+			stats.byStatus[parser.StatusInProgress],
+			float64(stats.byStatus[parser.StatusInProgress])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [gold]Blocked[-]:     %3d  (%.1f%%)\n",
+			stats.byStatus[parser.StatusBlocked],
+			float64(stats.byStatus[parser.StatusBlocked])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [gray]Closed[-]:      %3d  (%.1f%%)\n\n",
+			stats.byStatus[parser.StatusClosed],
+			float64(stats.byStatus[parser.StatusClosed])/float64(stats.total)*100))
+
+		// By Priority
+		sb.WriteString("[cyan::b]By Priority:[-::-]\n")
+		sb.WriteString(fmt.Sprintf("  [red]P0 (Critical)[-]: %3d  (%.1f%%)\n",
+			stats.byPriority[0],
+			float64(stats.byPriority[0])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [orangered]P1 (High)[-]:     %3d  (%.1f%%)\n",
+			stats.byPriority[1],
+			float64(stats.byPriority[1])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [lightskyblue]P2 (Normal)[-]:   %3d  (%.1f%%)\n",
+			stats.byPriority[2],
+			float64(stats.byPriority[2])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [gray]P3 (Low)[-]:      %3d  (%.1f%%)\n",
+			stats.byPriority[3],
+			float64(stats.byPriority[3])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  [gray]P4 (Lowest)[-]:   %3d  (%.1f%%)\n\n",
+			stats.byPriority[4],
+			float64(stats.byPriority[4])/float64(stats.total)*100))
+
+		// By Type
+		sb.WriteString("[cyan::b]By Type:[-::-]\n")
+		sb.WriteString(fmt.Sprintf("  Bug:      %3d  (%.1f%%)\n",
+			stats.byType[parser.TypeBug],
+			float64(stats.byType[parser.TypeBug])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  Feature:  %3d  (%.1f%%)\n",
+			stats.byType[parser.TypeFeature],
+			float64(stats.byType[parser.TypeFeature])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  Task:     %3d  (%.1f%%)\n",
+			stats.byType[parser.TypeTask],
+			float64(stats.byType[parser.TypeTask])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  Epic:     %3d  (%.1f%%)\n",
+			stats.byType[parser.TypeEpic],
+			float64(stats.byType[parser.TypeEpic])/float64(stats.total)*100))
+		sb.WriteString(fmt.Sprintf("  Chore:    %3d  (%.1f%%)\n\n",
+			stats.byType[parser.TypeChore],
+			float64(stats.byType[parser.TypeChore])/float64(stats.total)*100))
+
+		// Dependencies
+		sb.WriteString("[cyan::b]Dependencies:[-::-]\n")
+		sb.WriteString(fmt.Sprintf("  Total:           %d\n", stats.totalDeps))
+		sb.WriteString(fmt.Sprintf("  Avg per issue:   %.2f\n", stats.avgDepsPerIssue))
+
+		sb.WriteString("\n[gray]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n")
+		sb.WriteString("[yellow]Press ESC or S to close[-]")
+
+		// Create stats text view
+		statsTextView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetText(sb.String()).
+			SetTextAlign(tview.AlignLeft)
+		statsTextView.SetBorder(true).
+			SetTitle(" Statistics Dashboard ").
+			SetTitleAlign(tview.AlignCenter)
+
+		// Create modal (centered, slightly smaller than help)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(statsTextView, 0, 2, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		// Add input capture to close on ESC or S
+		modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && (event.Rune() == 'S' || event.Rune() == 's')) {
+				pages.RemovePage("stats")
+				app.SetFocus(issueList)
+				return nil
+			}
+			return event
+		})
+
+		// Show modal
+		pages.AddPage("stats", modal, true, true)
+		app.SetFocus(modal)
+	}
+
 	// Helper function to show help screen
 	showHelpScreen := func() {
 		helpText := `[yellow::b]beads-tui Keyboard Shortcuts[-::-]
@@ -885,6 +1017,7 @@ func main() {
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
   f           Quick filter (type: p1 bug, feature, etc.)
+  S           Show statistics dashboard
   m           Toggle mouse mode on/off
   r           Manual refresh
 
@@ -2056,6 +2189,10 @@ func main() {
 			case 'f':
 				// Show quick filter
 				showQuickFilter()
+				return nil
+			case 'S':
+				// Show stats dashboard
+				showStatsOverlay()
 				return nil
 			case '0', '1', '2', '3', '4':
 				// Quick priority change
