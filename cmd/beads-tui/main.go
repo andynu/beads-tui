@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -16,12 +20,46 @@ import (
 )
 
 func main() {
+	// Parse command line flags
+	debugMode := flag.Bool("debug", false, "Enable debug logging to file")
+	flag.Parse()
+
+	// Set up logging
+	var logFile *os.File
+	if *debugMode {
+		logDir := filepath.Join(os.Getenv("HOME"), ".beads-tui")
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to create log directory: %v\n", err)
+		} else {
+			logPath := filepath.Join(logDir, fmt.Sprintf("debug-%s.log", time.Now().Format("2006-01-02-15-04-05")))
+			var err error
+			logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to open log file: %v\n", err)
+			} else {
+				log.SetOutput(logFile)
+				log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+				defer logFile.Close()
+				log.Printf("=== beads-tui started in debug mode ===")
+				log.Printf("Log file: %s", logPath)
+				fmt.Fprintf(os.Stderr, "Debug logging enabled: %s\n", logPath)
+			}
+		}
+	} else {
+		// Disable logging completely when not in debug mode
+		log.SetOutput(io.Discard)
+		log.SetFlags(0)
+	}
+
+	log.Printf("Finding .beads directory")
 	// Find .beads directory
 	beadsDir, err := findBeadsDir()
 	if err != nil {
+		log.Printf("ERROR: Failed to find .beads directory: %v", err)
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+	log.Printf("Found .beads directory: %s", beadsDir)
 
 	dbPath := filepath.Join(beadsDir, "beads.db")
 
@@ -53,8 +91,8 @@ func main() {
 	// Issue list
 	issueList := tview.NewList().
 		ShowSecondaryText(false).
-		SetSelectedBackgroundColor(tcell.ColorNavy).
-		SetSelectedTextColor(tcell.ColorWhite)
+		SetSelectedBackgroundColor(tcell.ColorDarkCyan).
+		SetSelectedTextColor(tcell.ColorBlack)
 	issueList.SetBorder(true).SetTitle("Issues")
 
 	// Track mapping from list index to issue
@@ -66,6 +104,30 @@ func main() {
 	var searchQuery string
 	var searchMatches []int
 	var currentSearchIndex int
+
+	// Mouse mode state (default: disabled for text selection)
+	var mouseEnabled bool
+
+	// Panel focus state (true = detail panel, false = issue list)
+	var detailPanelFocused bool
+
+	// Helper function to generate status bar text
+	getStatusBarText := func() string {
+		viewModeStr := "List"
+		if appState.GetViewMode() == state.ViewTree {
+			viewModeStr = "Tree"
+		}
+		mouseStr := "OFF"
+		if mouseEnabled {
+			mouseStr = "ON"
+		}
+		focusStr := "List"
+		if detailPanelFocused {
+			focusStr = "Details"
+		}
+		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, a to create, q to quit]",
+			beadsDir, len(appState.GetAllIssues()), viewModeStr, mouseStr, focusStr)
+	}
 
 	// Helper function to render tree node recursively
 	var renderTreeNode func(node *state.TreeNode, prefix string, isLast bool, currentIndex *int)
@@ -190,34 +252,38 @@ func main() {
 
 	// Function to load and display issues (for async updates after app starts)
 	refreshIssues := func() {
+		log.Printf("REFRESH: Starting issue refresh")
 		// Load issues from SQLite with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		log.Printf("REFRESH: Loading issues from SQLite (timeout=5s)")
 		issues, err := sqliteReader.LoadIssues(ctx)
 		if err != nil {
+			log.Printf("REFRESH ERROR: Failed to load issues: %v", err)
 			// Show error in status bar
 			app.QueueUpdateDraw(func() {
 				statusBar.SetText(fmt.Sprintf("[red]Error loading issues: %v[-]", err))
 			})
 			return
 		}
+		log.Printf("REFRESH: Loaded %d issues from database", len(issues))
 
 		// Update state
 		appState.LoadIssues(issues)
+		log.Printf("REFRESH: Updated app state")
 
 		// Update UI on main thread
+		log.Printf("REFRESH: Queueing UI update")
 		app.QueueUpdateDraw(func() {
+			log.Printf("REFRESH: UI update executing")
 			// Update status bar
-			viewModeStr := "List"
-			if appState.GetViewMode() == state.ViewTree {
-				viewModeStr = "Tree"
-			}
-			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
-				beadsDir, len(issues), viewModeStr))
+			statusBar.SetText(getStatusBarText())
 
 			populateIssueList()
+			log.Printf("REFRESH: UI update complete")
 		})
+		log.Printf("REFRESH: Issue refresh complete")
 	}
 
 	// Initial load (before app starts, no QueueUpdateDraw)
@@ -229,24 +295,30 @@ func main() {
 		os.Exit(1)
 	}
 	appState.LoadIssues(issues)
-	viewModeStr := "List"
-	if appState.GetViewMode() == state.ViewTree {
-		viewModeStr = "Tree"
-	}
-	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
-		beadsDir, len(issues), viewModeStr))
+	statusBar.SetText(getStatusBarText())
 	populateIssueList()
 
 	// Set up filesystem watcher on the database
-	fileWatcher, err := watcher.New(dbPath, 200*time.Millisecond, refreshIssues)
+	log.Printf("Setting up file watcher on: %s", dbPath)
+	fileWatcher, err := watcher.New(dbPath, 200*time.Millisecond, func() {
+		log.Printf("WATCHER: File change detected, triggering refresh")
+		refreshIssues()
+	})
 	if err != nil {
+		log.Printf("WATCHER ERROR: Failed to create watcher: %v", err)
 		fmt.Fprintf(os.Stderr, "Warning: failed to set up database watcher: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Live updates will not work. Press 'r' to manually refresh.\n")
 	} else {
 		if err := fileWatcher.Start(); err != nil {
+			log.Printf("WATCHER ERROR: Failed to start watcher: %v", err)
 			fmt.Fprintf(os.Stderr, "Warning: failed to start database watcher: %v\n", err)
+		} else {
+			log.Printf("WATCHER: File watcher started successfully")
 		}
-		defer fileWatcher.Stop()
+		defer func() {
+			log.Printf("WATCHER: Stopping file watcher")
+			fileWatcher.Stop()
+		}()
 	}
 
 	// Detail panel
@@ -256,6 +328,26 @@ func main() {
 		SetWrap(true)
 	detailPanel.SetBorder(true).SetTitle("Details")
 	detailPanel.SetText("[yellow]Navigate to an issue to view details[-]")
+
+	// Helper function to update panel focus indicators
+	updatePanelFocus := func() {
+		if detailPanelFocused {
+			issueList.SetBorderColor(tcell.ColorGray)
+			issueList.SetTitle("Issues")
+			detailPanel.SetBorderColor(tcell.ColorYellow)
+			detailPanel.SetTitle("Details [FOCUSED - Use Ctrl-d/u to scroll, ESC to return]")
+			app.SetFocus(detailPanel)
+		} else {
+			issueList.SetBorderColor(tcell.ColorDefault)
+			issueList.SetTitle("Issues")
+			detailPanel.SetBorderColor(tcell.ColorGray)
+			detailPanel.SetTitle("Details [Press Tab or Enter to focus]")
+			app.SetFocus(issueList)
+		}
+		statusBar.SetText(getStatusBarText())
+	}
+	// Set initial focus state
+	updatePanelFocus()
 
 	// Function to show issue details
 	showIssueDetails := func(issue *parser.Issue) {
@@ -280,6 +372,10 @@ func main() {
 			AddItem(issueList, 0, 1, true).
 			AddItem(detailPanel, 0, 2, false),
 			0, 1, true)
+
+	// Pages for modal dialogs
+	pages := tview.NewPages().
+		AddPage("main", flex, true, true)
 
 	// Helper function to perform search
 	performSearch := func(query string) {
@@ -335,20 +431,193 @@ func main() {
 			searchQuery, currentSearchIndex+1, len(searchMatches)))
 	}
 
+	// Helper function to show help screen
+	showHelpScreen := func() {
+		helpText := `[yellow::b]beads-tui Keyboard Shortcuts[-::-]
+
+[cyan::b]Navigation[-::-]
+  j / ↓       Move down
+  k / ↑       Move up
+  gg          Jump to top
+  G           Jump to bottom
+  Tab         Focus detail panel for scrolling
+  Enter       Focus detail panel (when on issue)
+  ESC         Return focus to issue list
+
+[cyan::b]Search[-::-]
+  /           Start search mode
+  n           Next search result
+  N           Previous search result
+  ESC         Exit search mode
+
+[cyan::b]Quick Actions[-::-]
+  0-4         Set priority (P0=critical, P1=high, P2=normal, P3=low, P4=lowest)
+  s           Cycle status (open → in_progress → blocked → closed → open)
+  a           Create new issue (vim-style "add")
+
+[cyan::b]View Controls[-::-]
+  t           Toggle between list and tree view
+  m           Toggle mouse mode on/off
+  r           Manual refresh
+
+[cyan::b]Detail Panel Scrolling (when focused)[-::-]
+  Ctrl-d      Scroll down half page
+  Ctrl-u      Scroll up half page
+  Ctrl-e      Scroll down one line
+  Ctrl-y      Scroll up one line
+  PageDown    Scroll down full page
+  PageUp      Scroll up full page
+  Home        Jump to top of details
+  End         Jump to bottom of details
+
+[cyan::b]General[-::-]
+  ?           Show this help screen
+  q           Quit
+
+[gray]Press ESC or ? to close this help screen[-]`
+
+		// Create help text view
+		helpTextView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetText(helpText).
+			SetTextAlign(tview.AlignLeft)
+		helpTextView.SetBorder(true).
+			SetTitle(" Help - Keyboard Shortcuts ").
+			SetTitleAlign(tview.AlignCenter)
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(helpTextView, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		// Add input capture to close on ESC or ?
+		modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && event.Rune() == '?') {
+				pages.RemovePage("help")
+				app.SetFocus(issueList)
+				return nil
+			}
+			return event
+		})
+
+		pages.AddPage("help", modal, true, true)
+		app.SetFocus(modal)
+	}
+
+	// Helper function to show issue creation dialog
+	showCreateIssueDialog := func() {
+		// Create form
+		form := tview.NewForm()
+
+		var title, description, priority, issueType string
+		priority = "2" // Default to P2
+		issueType = "feature" // Default to feature
+
+		// Get current issue for potential parent
+		var currentIssueID string
+		if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+			currentIssueID = issue.ID
+		}
+
+		// Add form fields
+		form.AddInputField("Title", "", 50, nil, func(text string) {
+			title = text
+		})
+		form.AddTextArea("Description", "", 60, 5, 0, func(text string) {
+			description = text
+		})
+		form.AddDropDown("Priority", []string{"P0 (Critical)", "P1 (High)", "P2 (Normal)", "P3 (Low)", "P4 (Lowest)"}, 2, func(option string, index int) {
+			priority = fmt.Sprintf("%d", index)
+		})
+		form.AddDropDown("Type", []string{"bug", "feature", "task", "epic", "chore"}, 1, func(option string, index int) {
+			issueType = option
+		})
+		if currentIssueID != "" {
+			form.AddCheckbox("Add as child of "+currentIssueID, false, nil)
+		}
+
+		// Add buttons
+		form.AddButton("Create", func() {
+			if title == "" {
+				statusBar.SetText("[red]Error: Title is required[-]")
+				return
+			}
+
+			// Build bd create command
+			cmd := fmt.Sprintf("bd create %q -p %s -t %s", title, priority, issueType)
+			if description != "" {
+				cmd += fmt.Sprintf(" --description %q", description)
+			}
+
+			// Check if we should add parent relationship
+			if currentIssueID != "" {
+				// Check checkbox state
+				formItem := form.GetFormItemByLabel("Add as child of " + currentIssueID)
+				if checkbox, ok := formItem.(*tview.Checkbox); ok && checkbox.IsChecked() {
+					cmd += fmt.Sprintf(" --parent %s", currentIssueID)
+				}
+			}
+
+			log.Printf("BD COMMAND: Creating issue: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Issue creation failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
+				statusBar.SetText("[green]✓ Issue created successfully[-]")
+
+				// Close dialog
+				pages.RemovePage("create_issue")
+				app.SetFocus(issueList)
+
+				// Refresh issues after a short delay
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues()
+				})
+			}
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("create_issue")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Create New Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("create_issue")
+			app.SetFocus(issueList)
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 3, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("create_issue", modal, true, true)
+		app.SetFocus(form)
+	}
+
 	// Set up key bindings
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Log all keyboard events in debug mode
+		log.Printf("KEY EVENT: key=%v rune=%q mod=%v searchMode=%v detailFocus=%v",
+			event.Key(), event.Rune(), event.Modifiers(), searchMode, detailPanelFocused)
+
 		// Handle search mode
 		if searchMode {
 			switch event.Key() {
 			case tcell.KeyEscape:
 				searchMode = false
 				searchQuery = ""
-				viewModeStr := "List"
-				if appState.GetViewMode() == state.ViewTree {
-					viewModeStr = "Tree"
-				}
-				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
-					beadsDir, len(appState.GetAllIssues()), viewModeStr))
+				statusBar.SetText(getStatusBarText())
 				return nil
 			case tcell.KeyEnter:
 				performSearch(searchQuery)
@@ -368,8 +637,72 @@ func main() {
 			return nil
 		}
 
-		// Normal mode key bindings
+		// Handle detail panel scrolling when focused
+		if detailPanelFocused {
+			switch event.Key() {
+			case tcell.KeyEscape:
+				// Return focus to issue list
+				detailPanelFocused = false
+				updatePanelFocus()
+				return nil
+			case tcell.KeyCtrlD:
+				// Scroll down half page
+				_, _, _, height := detailPanel.GetInnerRect()
+				for i := 0; i < height/2; i++ {
+					detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone), nil)
+				}
+				return nil
+			case tcell.KeyCtrlU:
+				// Scroll up half page
+				_, _, _, height := detailPanel.GetInnerRect()
+				for i := 0; i < height/2; i++ {
+					detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone), nil)
+				}
+				return nil
+			case tcell.KeyCtrlE:
+				// Scroll down one line
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyCtrlY:
+				// Scroll up one line
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyPgDn:
+				// Page down
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyPgDn, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyPgUp:
+				// Page up
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyPgUp, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyHome:
+				// Jump to top
+				detailPanel.ScrollToBeginning()
+				return nil
+			case tcell.KeyEnd:
+				// Jump to end
+				detailPanel.ScrollToEnd()
+				return nil
+			}
+			// Allow other keys to pass through
+			return event
+		}
+
+		// Normal mode key bindings (issue list focused)
 		switch event.Key() {
+		case tcell.KeyTab:
+			// Focus detail panel
+			detailPanelFocused = true
+			updatePanelFocus()
+			return nil
+		case tcell.KeyEnter:
+			// If on an issue, focus detail panel (alternative to Tab)
+			if _, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+				detailPanelFocused = true
+				updatePanelFocus()
+				return nil
+			}
+			return event
 		case tcell.KeyRune:
 			switch event.Rune() {
 			case 'q':
@@ -416,13 +749,81 @@ func main() {
 			case 't':
 				// Toggle view mode
 				appState.ToggleViewMode()
-				viewModeStr := "List"
-				if appState.GetViewMode() == state.ViewTree {
-					viewModeStr = "Tree"
-				}
-				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
-					beadsDir, len(appState.GetAllIssues()), viewModeStr))
+				statusBar.SetText(getStatusBarText())
 				populateIssueList()
+				return nil
+			case 'm':
+				// Toggle mouse mode
+				mouseEnabled = !mouseEnabled
+				app.EnableMouse(mouseEnabled)
+				statusBar.SetText(getStatusBarText())
+				return nil
+			case 'a':
+				// Open issue creation dialog
+				showCreateIssueDialog()
+				return nil
+			case '?':
+				// Show help screen
+				showHelpScreen()
+				return nil
+			case '0', '1', '2', '3', '4':
+				// Quick priority change
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					priority := int(event.Rune() - '0')
+					// Update priority via bd command
+					cmd := fmt.Sprintf("bd update %s --priority %d", issue.ID, priority)
+					log.Printf("BD COMMAND: Executing priority update: %s", cmd)
+					err := exec.Command("sh", "-c", cmd).Run()
+					if err != nil {
+						log.Printf("BD COMMAND ERROR: Priority update failed: %v", err)
+						statusBar.SetText(fmt.Sprintf("[red]Error updating priority: %v[-]", err))
+					} else {
+						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", issue.ID, priority)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", issue.ID, priority))
+						// Refresh issues after a short delay
+						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
+						time.AfterFunc(500*time.Millisecond, func() {
+							log.Printf("BD COMMAND: Delayed refresh starting")
+							refreshIssues()
+						})
+					}
+				}
+				return nil
+			case 's':
+				// Toggle status
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					// Cycle through statuses: open -> in_progress -> blocked -> closed -> open
+					var newStatus string
+					switch issue.Status {
+					case parser.StatusOpen:
+						newStatus = "in_progress"
+					case parser.StatusInProgress:
+						newStatus = "blocked"
+					case parser.StatusBlocked:
+						newStatus = "closed"
+					case parser.StatusClosed:
+						newStatus = "open"
+					default:
+						newStatus = "in_progress"
+					}
+					// Update status via bd command
+					cmd := fmt.Sprintf("bd update %s --status %s", issue.ID, newStatus)
+					log.Printf("BD COMMAND: Executing status update: %s", cmd)
+					err := exec.Command("sh", "-c", cmd).Run()
+					if err != nil {
+						log.Printf("BD COMMAND ERROR: Status update failed: %v", err)
+						statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
+					} else {
+						log.Printf("BD COMMAND: Status update successful for %s -> %s", issue.ID, newStatus)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issue.ID, newStatus))
+						// Refresh issues after a short delay
+						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
+						time.AfterFunc(500*time.Millisecond, func() {
+							log.Printf("BD COMMAND: Delayed refresh starting")
+							refreshIssues()
+						})
+					}
+				}
 				return nil
 			default:
 				// Reset g flag if any other key is pressed
@@ -433,12 +834,7 @@ func main() {
 			if len(searchMatches) > 0 {
 				searchMatches = nil
 				currentSearchIndex = -1
-				viewModeStr := "List"
-				if appState.GetViewMode() == state.ViewTree {
-					viewModeStr = "Tree"
-				}
-				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
-					beadsDir, len(appState.GetAllIssues()), viewModeStr))
+				statusBar.SetText(getStatusBarText())
 				return nil
 			}
 		default:
@@ -449,9 +845,12 @@ func main() {
 
 	// Run application
 	// Note: Mouse disabled to allow terminal text selection (tui-p62)
-	if err := app.SetRoot(flex, true).Run(); err != nil {
+	log.Printf("APP: Starting tview application main loop")
+	if err := app.SetRoot(pages, true).Run(); err != nil {
+		log.Printf("APP ERROR: Application crashed: %v", err)
 		panic(err)
 	}
+	log.Printf("APP: Application exited normally")
 }
 
 // findBeadsDir searches for .beads directory in current and parent directories
