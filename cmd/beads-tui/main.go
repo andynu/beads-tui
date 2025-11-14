@@ -122,7 +122,7 @@ func main() {
 		// Update UI on main thread
 		app.QueueUpdateDraw(func() {
 			// Update status bar
-			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh, Enter for details]",
+			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
 				beadsDir, len(issues)))
 
 			populateIssueList()
@@ -136,7 +136,7 @@ func main() {
 		os.Exit(1)
 	}
 	appState.LoadIssues(issues)
-	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh, Enter for details]",
+	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
 		beadsDir, len(issues)))
 	populateIssueList()
 
@@ -158,7 +158,7 @@ func main() {
 		SetScrollable(true).
 		SetWrap(true)
 	detailPanel.SetBorder(true).SetTitle("Details")
-	detailPanel.SetText("[yellow]Select an issue and press Enter to view details[-]")
+	detailPanel.SetText("[yellow]Navigate to an issue to view details[-]")
 
 	// Function to show issue details
 	showIssueDetails := func(issue *parser.Issue) {
@@ -167,8 +167,8 @@ func main() {
 		detailPanel.ScrollToBeginning()
 	}
 
-	// Set up selection handler for issue list
-	issueList.SetSelectedFunc(func(index int, mainText, secondaryText string, shortcut rune) {
+	// Set up change handler to auto-show details on selection change
+	issueList.SetChangedFunc(func(index int, mainText, secondaryText string, shortcut rune) {
 		// Check if the selected item is an issue (not a header)
 		if issue, ok := indexToIssue[index]; ok {
 			showIssueDetails(issue)
