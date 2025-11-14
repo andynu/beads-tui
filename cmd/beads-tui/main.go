@@ -1520,16 +1520,16 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Create New Issue ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Create New Issue (Ctrl-S to submit) ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("create_issue")
 			app.SetFocus(issueList)
 		})
 
-		// Add Ctrl-Enter handler to submit form
+		// Add Ctrl-S handler to submit form (Ctrl-Enter is reserved by terminal)
 		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-			if event.Key() == tcell.KeyCtrlJ || (event.Key() == tcell.KeyEnter && event.Modifiers()&tcell.ModCtrl != 0) {
-				// Ctrl-Enter pressed - submit form
+			if event.Key() == tcell.KeyCtrlS {
+				// Ctrl-S pressed - submit form
 				if title == "" {
 					statusBar.SetText("[red]Error: Title is required[-]")
 					return nil
@@ -1549,7 +1549,7 @@ func main() {
 					}
 				}
 
-				log.Printf("BD COMMAND: Creating issue (Ctrl-Enter): %s", cmd)
+				log.Printf("BD COMMAND: Creating issue (Ctrl-S): %s", cmd)
 				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 				if err != nil {
 					log.Printf("BD COMMAND ERROR: Issue creation failed: %v, output: %s", err, string(output))
