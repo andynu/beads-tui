@@ -82,6 +82,11 @@ func (s *State) LoadIssues(issues []*parser.Issue) {
 
 	// Categorize issues
 	s.categorizeIssues()
+
+	// Rebuild tree if in tree view mode
+	if s.viewMode == ViewTree {
+		s.buildDependencyTree()
+	}
 }
 
 // categorizeIssues separates issues into ready, blocked, in_progress, and closed
