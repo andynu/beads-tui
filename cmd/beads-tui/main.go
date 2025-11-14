@@ -115,6 +115,9 @@ func main() {
 	// Panel focus state (true = detail panel, false = issue list)
 	var detailPanelFocused bool
 
+	// Show closed issues in list view (default: false)
+	var showClosedIssues bool
+
 	// Track currently displayed issue in detail panel (for clipboard copy)
 	var currentDetailIssue *parser.Issue
 
@@ -134,15 +137,23 @@ func main() {
 		}
 
 		// Count visible issues after filtering
-		visibleCount := len(appState.GetReadyIssues()) + len(appState.GetBlockedIssues()) + len(appState.GetInProgressIssues()) + len(appState.GetClosedIssues())
+		visibleCount := len(appState.GetReadyIssues()) + len(appState.GetBlockedIssues()) + len(appState.GetInProgressIssues())
+		if showClosedIssues {
+			visibleCount += len(appState.GetClosedIssues())
+		}
 
 		filterText := ""
 		if appState.HasActiveFilters() {
 			filterText = fmt.Sprintf(" [Filters: %s]", appState.GetActiveFilters())
 		}
 
-		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
-			beadsDir, visibleCount, filterText, viewModeStr, mouseStr, focusStr)
+		closedText := ""
+		if showClosedIssues {
+			closedText = " [Showing Closed]"
+		}
+
+		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
+			beadsDir, visibleCount, filterText, closedText, viewModeStr, mouseStr, focusStr)
 	}
 
 	// Helper function to render tree node recursively
@@ -312,31 +323,33 @@ func main() {
 				}
 			}
 
-			// Add closed issues
-			closedIssues := appState.GetClosedIssues()
-			if len(closedIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[gray::b]CLOSED (%d)[-::-]", len(closedIssues)), "", 0, nil)
-				currentIndex++
-
-				for _, issue := range closedIssues {
-					priorityColor := getPriorityColor(issue.Priority)
-					typeIcon := getTypeIcon(issue.IssueType)
-					text := fmt.Sprintf("  [%s]✓[-] %s %s [P%d] %s",
-						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
-					// Add labels if present
-					if len(issue.Labels) > 0 {
-						text += " [gray]"
-						for i, label := range issue.Labels {
-							if i > 0 {
-								text += " "
-							}
-							text += "#" + label
-						}
-						text += "[-]"
-					}
-					issueList.AddItem(text, "", 0, nil)
-					indexToIssue[currentIndex] = issue
+			// Add closed issues (only if showClosedIssues is enabled)
+			if showClosedIssues {
+				closedIssues := appState.GetClosedIssues()
+				if len(closedIssues) > 0 {
+					issueList.AddItem(fmt.Sprintf("\n[gray::b]⬤ CLOSED (%d)[-::-]", len(closedIssues)), "", 0, nil)
 					currentIndex++
+
+					for _, issue := range closedIssues {
+						priorityColor := getPriorityColor(issue.Priority)
+						typeIcon := getTypeIcon(issue.IssueType)
+						text := fmt.Sprintf("  [%s]✓[-] %s %s [P%d] %s",
+							priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
+						// Add labels if present
+						if len(issue.Labels) > 0 {
+							text += " [gray]"
+							for i, label := range issue.Labels {
+								if i > 0 {
+									text += " "
+								}
+								text += "#" + label
+							}
+							text += "[-]"
+						}
+						issueList.AddItem(text, "", 0, nil)
+						indexToIssue[currentIndex] = issue
+						currentIndex++
+					}
 				}
 			}
 		}
@@ -1016,6 +1029,7 @@ func main() {
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
+  C           Toggle showing closed issues in list view
   f           Quick filter (type: p1 bug, feature, etc.)
   S           Show statistics dashboard
   m           Toggle mouse mode on/off
@@ -2106,6 +2120,12 @@ func main() {
 			case 't':
 				// Toggle view mode
 				appState.ToggleViewMode()
+				statusBar.SetText(getStatusBarText())
+				populateIssueList()
+				return nil
+			case 'C':
+				// Toggle showing closed issues
+				showClosedIssues = !showClosedIssues
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
 				return nil
