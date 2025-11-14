@@ -186,14 +186,14 @@ func main() {
 
 		// Add labels if present
 		if len(issue.Labels) > 0 {
-			text += " [darkgray]["
+			text += " [gray]"
 			for i, label := range issue.Labels {
 				if i > 0 {
-					text += ", "
+					text += " "
 				}
-				text += label
+				text += "#" + label
 			}
-			text += "][-]"
+			text += "[-]"
 		}
 
 		issueList.AddItem(text, "", 0, nil)
@@ -240,14 +240,14 @@ func main() {
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
-						text += " [darkgray]["
+						text += " [gray]"
 						for i, label := range issue.Labels {
 							if i > 0 {
-								text += ", "
+								text += " "
 							}
-							text += label
+							text += "#" + label
 						}
-						text += "][-]"
+						text += "[-]"
 					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
@@ -267,14 +267,14 @@ func main() {
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
-						text += " [darkgray]["
+						text += " [gray]"
 						for i, label := range issue.Labels {
 							if i > 0 {
-								text += ", "
+								text += " "
 							}
-							text += label
+							text += "#" + label
 						}
-						text += "][-]"
+						text += "[-]"
 					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
@@ -294,14 +294,14 @@ func main() {
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
-						text += " [darkgray]["
+						text += " [gray]"
 						for i, label := range issue.Labels {
 							if i > 0 {
-								text += ", "
+								text += " "
 							}
-							text += label
+							text += "#" + label
 						}
-						text += "][-]"
+						text += "[-]"
 					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
@@ -321,14 +321,14 @@ func main() {
 						priorityColor, issue.ID, issue.Priority, issue.Title)
 					// Add labels if present
 					if len(issue.Labels) > 0 {
-						text += " [darkgray]["
+						text += " [gray]"
 						for i, label := range issue.Labels {
 							if i > 0 {
-								text += ", "
+								text += " "
 							}
-							text += label
+							text += "#" + label
 						}
-						text += "][-]"
+						text += "[-]"
 					}
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
@@ -910,14 +910,14 @@ func main() {
   [red]P0[-]          Critical
   [orangered]P1[-]          High
   [lightskyblue]P2[-]          Normal
-  [darkgray]P3[-]          Low
+  [gray]P3[-]          Low
   [gray]P4[-]          Lowest
 
 [cyan::b]Status Colors[-::-]
   [limegreen]●[-]           Ready
   [gold]○[-]           Blocked
   [deepskyblue]◆[-]           In Progress
-  [darkgray]·[-]           Closed
+  [gray]·[-]           Closed
 
 [gray]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]
 [yellow]Press ESC or ? to close this help[-]`
