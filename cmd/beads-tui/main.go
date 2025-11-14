@@ -15,6 +15,7 @@ import (
 	"github.com/andy/beads-tui/internal/state"
 	"github.com/andy/beads-tui/internal/storage"
 	"github.com/andy/beads-tui/internal/watcher"
+	"github.com/atotto/clipboard"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -105,11 +106,14 @@ func main() {
 	var searchMatches []int
 	var currentSearchIndex int
 
-	// Mouse mode state (default: disabled for text selection)
-	var mouseEnabled bool
+	// Mouse mode state (default: enabled)
+	var mouseEnabled = true
 
 	// Panel focus state (true = detail panel, false = issue list)
 	var detailPanelFocused bool
+
+	// Track currently displayed issue in detail panel (for clipboard copy)
+	var currentDetailIssue *parser.Issue
 
 	// Helper function to generate status bar text
 	getStatusBarText := func() string {
@@ -125,8 +129,17 @@ func main() {
 		if detailPanelFocused {
 			focusStr = "Details"
 		}
-		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, a to create, q to quit]",
-			beadsDir, len(appState.GetAllIssues()), viewModeStr, mouseStr, focusStr)
+
+		// Count visible issues after filtering
+		visibleCount := len(appState.GetReadyIssues()) + len(appState.GetBlockedIssues()) + len(appState.GetInProgressIssues()) + len(appState.GetClosedIssues())
+
+		filterText := ""
+		if appState.HasActiveFilters() {
+			filterText = fmt.Sprintf(" [Filters: %s]", appState.GetActiveFilters())
+		}
+
+		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for filters]",
+			beadsDir, visibleCount, filterText, viewModeStr, mouseStr, focusStr)
 	}
 
 	// Helper function to render tree node recursively
@@ -247,6 +260,22 @@ func main() {
 					currentIndex++
 				}
 			}
+
+			// Add closed issues
+			closedIssues := appState.GetClosedIssues()
+			if len(closedIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("\n[gray::b]CLOSED (%d)[-::-]", len(closedIssues)), "", 0, nil)
+				currentIndex++
+
+				for _, issue := range closedIssues {
+					priorityColor := getPriorityColor(issue.Priority)
+					text := fmt.Sprintf("  [%s]✓[-] %s [P%d] %s",
+						priorityColor, issue.ID, issue.Priority, issue.Title)
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
+			}
 		}
 	}
 
@@ -329,6 +358,40 @@ func main() {
 	detailPanel.SetBorder(true).SetTitle("Details")
 	detailPanel.SetText("[yellow]Navigate to an issue to view details[-]")
 
+	// Add mouse click handler for copying issue ID
+	detailPanel.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+		if action == tview.MouseLeftClick && currentDetailIssue != nil {
+			// Get click position
+			_, y := event.Position()
+			// Get the detail panel's position
+			_, panelY, _, _ := detailPanel.GetInnerRect()
+
+			// Calculate relative position within the text view
+			relativeY := y - panelY
+
+			// The issue ID is on line 2 (0-indexed line 1) of the detail text
+			// Format: "ID: <issue-id>  P<priority>  <status>"
+			if relativeY == 1 && currentDetailIssue != nil {
+				// Copy issue ID to clipboard
+				err := clipboard.WriteAll(currentDetailIssue.ID)
+				if err != nil {
+					log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
+					statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+				} else {
+					log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", currentDetailIssue.ID)
+					statusBar.SetText(fmt.Sprintf("[green]✓ Copied %s to clipboard[-]", currentDetailIssue.ID))
+					// Clear message after 2 seconds
+					time.AfterFunc(2*time.Second, func() {
+						app.QueueUpdateDraw(func() {
+							statusBar.SetText(getStatusBarText())
+						})
+					})
+				}
+			}
+		}
+		return action, event
+	})
+
 	// Helper function to update panel focus indicators
 	updatePanelFocus := func() {
 		if detailPanelFocused {
@@ -351,6 +414,7 @@ func main() {
 
 	// Function to show issue details
 	showIssueDetails := func(issue *parser.Issue) {
+		currentDetailIssue = issue
 		details := formatIssueDetails(issue)
 		detailPanel.SetText(details)
 		detailPanel.ScrollToBeginning()
@@ -431,6 +495,178 @@ func main() {
 			searchQuery, currentSearchIndex+1, len(searchMatches)))
 	}
 
+	// Helper function to show comment dialog
+	showCommentDialog := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		var commentText string
+
+		form.AddTextView("Adding comment to", issue.ID+" - "+issue.Title, 0, 2, false, false)
+		form.AddTextArea("Comment", "", 60, 8, 0, func(text string) {
+			commentText = text
+		})
+
+		form.AddButton("Save (Ctrl-S)", func() {
+			if commentText == "" {
+				statusBar.SetText("[red]Error: Comment cannot be empty[-]")
+				return
+			}
+
+			// Execute bd comment command
+			cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
+			log.Printf("BD COMMAND: Adding comment: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+				statusBar.SetText("[green]✓ Comment added successfully[-]")
+
+				// Close dialog
+				pages.RemovePage("comment_dialog")
+				app.SetFocus(issueList)
+
+				// Refresh issues after a short delay
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues()
+				})
+			}
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("comment_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Add Comment ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("comment_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Add Ctrl-S handler for save
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlS {
+				// Save comment directly
+				if commentText == "" {
+					statusBar.SetText("[red]Error: Comment cannot be empty[-]")
+					return nil
+				}
+
+				cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
+				log.Printf("BD COMMAND: Adding comment: %s", cmd)
+				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				if err != nil {
+					log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+					statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+				} else {
+					log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+					statusBar.SetText("[green]✓ Comment added successfully[-]")
+					pages.RemovePage("comment_dialog")
+					app.SetFocus(issueList)
+					time.AfterFunc(500*time.Millisecond, func() {
+						refreshIssues()
+					})
+				}
+				return nil
+			}
+			return event
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 3, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("comment_dialog", modal, true, true)
+		app.SetFocus(form)
+	}
+
+	// Helper function to show filter menu
+	showFilterMenu := func() {
+		form := tview.NewForm()
+
+		// Priority checkboxes
+		form.AddTextView("Priority Filter", "Toggle priorities to show:", 0, 1, false, false)
+		for p := 0; p <= 4; p++ {
+			priority := p // Capture for closure
+			checked := appState.IsPriorityFiltered(priority)
+			form.AddCheckbox(fmt.Sprintf("P%d", priority), checked, func(isChecked bool) {
+				appState.TogglePriorityFilter(priority)
+			})
+		}
+
+		// Type checkboxes
+		form.AddTextView("Type Filter", "Toggle types to show:", 0, 1, false, false)
+		types := []parser.IssueType{parser.TypeBug, parser.TypeFeature, parser.TypeTask, parser.TypeEpic, parser.TypeChore}
+		for _, t := range types {
+			issueType := t // Capture for closure
+			checked := appState.IsTypeFiltered(issueType)
+			form.AddCheckbox(string(issueType), checked, func(isChecked bool) {
+				appState.ToggleTypeFilter(issueType)
+			})
+		}
+
+		// Status checkboxes
+		form.AddTextView("Status Filter", "Toggle statuses to show:", 0, 1, false, false)
+		statuses := []parser.Status{parser.StatusOpen, parser.StatusInProgress, parser.StatusBlocked, parser.StatusClosed}
+		for _, s := range statuses {
+			status := s // Capture for closure
+			checked := appState.IsStatusFiltered(status)
+			form.AddCheckbox(string(status), checked, func(isChecked bool) {
+				appState.ToggleStatusFilter(status)
+			})
+		}
+
+		// Buttons
+		form.AddButton("Apply", func() {
+			pages.RemovePage("filter_menu")
+			app.SetFocus(issueList)
+			statusBar.SetText(getStatusBarText())
+			populateIssueList()
+		})
+		form.AddButton("Clear All", func() {
+			appState.ClearAllFilters()
+			pages.RemovePage("filter_menu")
+			app.SetFocus(issueList)
+			statusBar.SetText(getStatusBarText())
+			populateIssueList()
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("filter_menu")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Filter Issues ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("filter_menu")
+			app.SetFocus(issueList)
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("filter_menu", modal, true, true)
+		app.SetFocus(form)
+	}
+
 	// Helper function to show help screen
 	showHelpScreen := func() {
 		helpText := `[yellow::b]beads-tui Keyboard Shortcuts[-::-]
@@ -454,9 +690,11 @@ func main() {
   0-4         Set priority (P0=critical, P1=high, P2=normal, P3=low, P4=lowest)
   s           Cycle status (open → in_progress → blocked → closed → open)
   a           Create new issue (vim-style "add")
+  c           Add comment to selected issue
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
+  f           Open filter menu (priority, type, status)
   m           Toggle mouse mode on/off
   r           Manual refresh
 
@@ -611,6 +849,12 @@ func main() {
 		log.Printf("KEY EVENT: key=%v rune=%q mod=%v searchMode=%v detailFocus=%v",
 			event.Key(), event.Rune(), event.Modifiers(), searchMode, detailPanelFocused)
 
+		// If a modal is showing (not on main page), let the modal handle all input
+		currentPage, _ := pages.GetFrontPage()
+		if currentPage != "main" {
+			return event
+		}
+
 		// Handle search mode
 		if searchMode {
 			switch event.Key() {
@@ -762,9 +1006,17 @@ func main() {
 				// Open issue creation dialog
 				showCreateIssueDialog()
 				return nil
+			case 'c':
+				// Open comment dialog
+				showCommentDialog()
+				return nil
 			case '?':
 				// Show help screen
 				showHelpScreen()
+				return nil
+			case 'f':
+				// Show filter menu
+				showFilterMenu()
 				return nil
 			case '0', '1', '2', '3', '4':
 				// Quick priority change
@@ -844,7 +1096,8 @@ func main() {
 	})
 
 	// Run application
-	// Note: Mouse disabled to allow terminal text selection (tui-p62)
+	// Enable mouse by default (can be toggled with 'm' key)
+	app.EnableMouse(mouseEnabled)
 	log.Printf("APP: Starting tview application main loop")
 	if err := app.SetRoot(pages, true).Run(); err != nil {
 		log.Printf("APP ERROR: Application crashed: %v", err)
@@ -904,7 +1157,7 @@ func formatIssueDetails(issue *parser.Issue) string {
 	typeIcon := getTypeIcon(issue.IssueType)
 
 	result += fmt.Sprintf("[::b]%s %s[-::-]\n", typeIcon, issue.Title)
-	result += fmt.Sprintf("[gray]ID:[-] %s  ", issue.ID)
+	result += fmt.Sprintf("[gray]ID:[-] %s [blue](click to copy)[-]  ", issue.ID)
 	result += fmt.Sprintf("[%s]P%d[-]  ", priorityColor, issue.Priority)
 	result += fmt.Sprintf("[%s]%s[-]\n\n", statusColor, issue.Status)
 

@@ -1,6 +1,9 @@
 package state
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/andy/beads-tui/internal/parser"
 )
 
@@ -18,6 +21,11 @@ type State struct {
 	searchQuery      string
 	viewMode         ViewMode
 	treeNodes        []*TreeNode
+
+	// Filter state
+	priorityFilter map[int]bool           // nil = no filter, otherwise only show these priorities
+	typeFilter     map[parser.IssueType]bool // nil = no filter, otherwise only show these types
+	statusFilter   map[parser.Status]bool    // nil = no filter, otherwise only show these statuses
 }
 
 // FilterMode represents different filtering options
@@ -130,24 +138,52 @@ func (s *State) categorizeIssues() {
 	}
 }
 
+// applyFilters filters a list of issues based on active filters
+func (s *State) applyFilters(issues []*parser.Issue) []*parser.Issue {
+	if s.priorityFilter == nil && s.typeFilter == nil && s.statusFilter == nil {
+		return issues
+	}
+
+	var filtered []*parser.Issue
+	for _, issue := range issues {
+		// Check priority filter
+		if s.priorityFilter != nil && !s.priorityFilter[issue.Priority] {
+			continue
+		}
+
+		// Check type filter
+		if s.typeFilter != nil && !s.typeFilter[issue.IssueType] {
+			continue
+		}
+
+		// Check status filter
+		if s.statusFilter != nil && !s.statusFilter[issue.Status] {
+			continue
+		}
+
+		filtered = append(filtered, issue)
+	}
+	return filtered
+}
+
 // GetReadyIssues returns issues that are ready to work on
 func (s *State) GetReadyIssues() []*parser.Issue {
-	return s.readyIssues
+	return s.applyFilters(s.readyIssues)
 }
 
 // GetBlockedIssues returns issues that are blocked
 func (s *State) GetBlockedIssues() []*parser.Issue {
-	return s.blockedIssues
+	return s.applyFilters(s.blockedIssues)
 }
 
 // GetInProgressIssues returns issues that are in progress
 func (s *State) GetInProgressIssues() []*parser.Issue {
-	return s.inProgressIssues
+	return s.applyFilters(s.inProgressIssues)
 }
 
 // GetClosedIssues returns closed issues
 func (s *State) GetClosedIssues() []*parser.Issue {
-	return s.closedIssues
+	return s.applyFilters(s.closedIssues)
 }
 
 // GetAllIssues returns all issues
@@ -285,4 +321,130 @@ func (s *State) buildTreeNode(issue *parser.Issue, depth int, childrenMap map[st
 	}
 
 	return node
+}
+
+// TogglePriorityFilter toggles a priority in the filter
+func (s *State) TogglePriorityFilter(priority int) {
+	if s.priorityFilter == nil {
+		s.priorityFilter = make(map[int]bool)
+	}
+
+	if s.priorityFilter[priority] {
+		delete(s.priorityFilter, priority)
+		// If empty, set to nil to disable filtering
+		if len(s.priorityFilter) == 0 {
+			s.priorityFilter = nil
+		}
+	} else {
+		s.priorityFilter[priority] = true
+	}
+}
+
+// ToggleTypeFilter toggles an issue type in the filter
+func (s *State) ToggleTypeFilter(issueType parser.IssueType) {
+	if s.typeFilter == nil {
+		s.typeFilter = make(map[parser.IssueType]bool)
+	}
+
+	if s.typeFilter[issueType] {
+		delete(s.typeFilter, issueType)
+		if len(s.typeFilter) == 0 {
+			s.typeFilter = nil
+		}
+	} else {
+		s.typeFilter[issueType] = true
+	}
+}
+
+// ToggleStatusFilter toggles a status in the filter
+func (s *State) ToggleStatusFilter(status parser.Status) {
+	if s.statusFilter == nil {
+		s.statusFilter = make(map[parser.Status]bool)
+	}
+
+	if s.statusFilter[status] {
+		delete(s.statusFilter, status)
+		if len(s.statusFilter) == 0 {
+			s.statusFilter = nil
+		}
+	} else {
+		s.statusFilter[status] = true
+	}
+}
+
+// ClearAllFilters removes all active filters
+func (s *State) ClearAllFilters() {
+	s.priorityFilter = nil
+	s.typeFilter = nil
+	s.statusFilter = nil
+}
+
+// IsPriorityFiltered returns true if the given priority is in the active filter
+func (s *State) IsPriorityFiltered(priority int) bool {
+	return s.priorityFilter != nil && s.priorityFilter[priority]
+}
+
+// IsTypeFiltered returns true if the given type is in the active filter
+func (s *State) IsTypeFiltered(issueType parser.IssueType) bool {
+	return s.typeFilter != nil && s.typeFilter[issueType]
+}
+
+// IsStatusFiltered returns true if the given status is in the active filter
+func (s *State) IsStatusFiltered(status parser.Status) bool {
+	return s.statusFilter != nil && s.statusFilter[status]
+}
+
+// HasActiveFilters returns true if any filters are active
+func (s *State) HasActiveFilters() bool {
+	return s.priorityFilter != nil || s.typeFilter != nil || s.statusFilter != nil
+}
+
+// GetActiveFilters returns a human-readable description of active filters
+func (s *State) GetActiveFilters() string {
+	if !s.HasActiveFilters() {
+		return ""
+	}
+
+	var filters []string
+
+	// Priority filters
+	if s.priorityFilter != nil {
+		var priorities []string
+		for p := 0; p <= 4; p++ {
+			if s.priorityFilter[p] {
+				priorities = append(priorities, fmt.Sprintf("P%d", p))
+			}
+		}
+		if len(priorities) > 0 {
+			filters = append(filters, "Priority: "+strings.Join(priorities, ","))
+		}
+	}
+
+	// Type filters
+	if s.typeFilter != nil {
+		var types []string
+		for _, t := range []parser.IssueType{parser.TypeBug, parser.TypeFeature, parser.TypeTask, parser.TypeEpic, parser.TypeChore} {
+			if s.typeFilter[t] {
+				types = append(types, string(t))
+			}
+		}
+		if len(types) > 0 {
+			filters = append(filters, "Type: "+strings.Join(types, ","))
+		}
+	}
+
+	// Status filters
+	if s.statusFilter != nil {
+		var statuses []string
+		for _, st := range []parser.Status{parser.StatusOpen, parser.StatusInProgress, parser.StatusBlocked, parser.StatusClosed} {
+			if s.statusFilter[st] {
+				statuses = append(statuses, string(st))
+			}
+		}
+		if len(statuses) > 0 {
+			filters = append(filters, "Status: "+strings.Join(statuses, ","))
+		}
+	}
+
+	return strings.Join(filters, " | ")
 }
