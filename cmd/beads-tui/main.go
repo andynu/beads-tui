@@ -670,7 +670,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Add Comment (Ctrl-S to save) ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Add Comment ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("comment_dialog")
 			app.SetFocus(issueList)
@@ -1508,7 +1508,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Edit Issue (Ctrl-S to save) ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Edit Issue ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("edit_form")
 			app.SetFocus(issueList)
@@ -1704,7 +1704,7 @@ func main() {
 		}
 
 		// Add buttons
-		form.AddButton("Create", func() {
+		form.AddButton("Create (Ctrl-S)", func() {
 			if title == "" {
 				statusBar.SetText("[red]Error: Title is required[-]")
 				return
@@ -1749,7 +1749,7 @@ func main() {
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Create New Issue (Ctrl-S to submit) ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Create New Issue ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
 			pages.RemovePage("create_issue")
 			app.SetFocus(issueList)
