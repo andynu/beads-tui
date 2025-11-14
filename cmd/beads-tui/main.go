@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -747,6 +748,11 @@ func main() {
   s           Cycle status (open → in_progress → blocked → closed → open)
   a           Create new issue (vim-style "add")
   c           Add comment to selected issue
+  e           Edit issue fields (description, design, acceptance, notes) in $EDITOR
+  D           Manage dependencies (add/remove blocks, parent-child, related)
+  L           Manage labels (add/remove labels)
+  y           Yank (copy) issue ID to clipboard
+  Y           Yank (copy) issue ID with title to clipboard
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
@@ -818,6 +824,419 @@ func main() {
 
 		pages.AddPage("help", modal, true, true)
 		app.SetFocus(modal)
+	}
+
+	// Helper function to edit a field in $EDITOR
+	editFieldInEditor := func(issue *parser.Issue, fieldName string, currentValue string) {
+		// Get editor from environment or default to vim
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+
+		// Create temp file
+		tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-%s-%s.md", fieldName, issue.ID))
+		template := fmt.Sprintf(`# Edit %s for %s
+# Lines starting with # are ignored
+# Save and exit to update, or exit without saving to cancel
+
+%s`, fieldName, issue.ID, currentValue)
+
+		if err := os.WriteFile(tempFile, []byte(template), 0600); err != nil {
+			log.Printf("EDITOR ERROR: Failed to create temp file: %v", err)
+			statusBar.SetText(fmt.Sprintf("[red]Error creating temp file: %v[-]", err))
+			return
+		}
+		defer os.Remove(tempFile)
+
+		// Suspend TUI
+		app.Suspend(func() {
+			log.Printf("EDITOR: Spawning editor: %s %s", editor, tempFile)
+			// Spawn editor
+			cmd := exec.Command(editor, tempFile)
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			if err := cmd.Run(); err != nil {
+				log.Printf("EDITOR ERROR: Editor exited with error: %v", err)
+				fmt.Fprintf(os.Stderr, "\nEditor exited with error: %v\nPress Enter to continue...", err)
+				fmt.Scanln()
+				return
+			}
+
+			// Read temp file
+			content, err := os.ReadFile(tempFile)
+			if err != nil {
+				log.Printf("EDITOR ERROR: Failed to read temp file: %v", err)
+				fmt.Fprintf(os.Stderr, "\nFailed to read temp file: %v\nPress Enter to continue...", err)
+				fmt.Scanln()
+				return
+			}
+
+			// Strip comment lines and trim
+			var lines []string
+			for _, line := range strings.Split(string(content), "\n") {
+				if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+					lines = append(lines, line)
+				}
+			}
+			strippedContent := strings.TrimSpace(strings.Join(lines, "\n"))
+
+			// If content is empty, ask for confirmation
+			if strippedContent == "" && currentValue != "" {
+				fmt.Print("\nContent is empty. Clear this field? (y/n): ")
+				var response string
+				fmt.Scanln(&response)
+				if response != "y" && response != "Y" {
+					log.Printf("EDITOR: User cancelled clearing field")
+					return
+				}
+			}
+
+			// Update via bd command
+			var bdFieldFlag string
+			switch strings.ToLower(fieldName) {
+			case "description":
+				bdFieldFlag = "--description"
+			case "design":
+				bdFieldFlag = "--design"
+			case "acceptance":
+				bdFieldFlag = "--acceptance"
+			case "notes":
+				bdFieldFlag = "--notes"
+			default:
+				log.Printf("EDITOR ERROR: Unknown field name: %s", fieldName)
+				fmt.Fprintf(os.Stderr, "\nUnknown field: %s\nPress Enter to continue...", fieldName)
+				fmt.Scanln()
+				return
+			}
+
+			// Write content to temp file for bd command (avoid shell escaping issues)
+			contentFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-content-%s.txt", issue.ID))
+			if err := os.WriteFile(contentFile, []byte(strippedContent), 0600); err != nil {
+				log.Printf("EDITOR ERROR: Failed to write content file: %v", err)
+				fmt.Fprintf(os.Stderr, "\nFailed to write content file: %v\nPress Enter to continue...", err)
+				fmt.Scanln()
+				return
+			}
+			defer os.Remove(contentFile)
+
+			bdCmd := fmt.Sprintf("bd update %s %s \"$(cat %s)\"", issue.ID, bdFieldFlag, contentFile)
+			log.Printf("BD COMMAND: Updating %s: %s", fieldName, bdCmd)
+			output, err := exec.Command("sh", "-c", bdCmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Update failed: %v, output: %s", err, string(output))
+				fmt.Fprintf(os.Stderr, "\nError updating %s: %v\nOutput: %s\nPress Enter to continue...", fieldName, err, string(output))
+				fmt.Scanln()
+			} else {
+				log.Printf("BD COMMAND: Update successful for %s", fieldName)
+				fmt.Fprintf(os.Stderr, "\n✓ Updated %s for %s\n", fieldName, issue.ID)
+				time.Sleep(500 * time.Millisecond)
+			}
+		})
+
+		// Resume TUI and refresh
+		if err := app.Draw(); err != nil {
+			log.Printf("APP ERROR: Failed to redraw after editor: %v", err)
+		}
+		statusBar.SetText(fmt.Sprintf("[green]✓ Updated %s for %s[-]", fieldName, issue.ID))
+		time.AfterFunc(500*time.Millisecond, func() {
+			refreshIssues(issue.ID)
+		})
+	}
+
+	// Helper function to manage dependencies
+	showDependencyDialog := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		form.AddTextView("Managing dependencies for", issue.ID+" - "+issue.Title, 0, 2, false, false)
+
+		// Show current dependencies
+		if len(issue.Dependencies) > 0 {
+			depText := "Current Dependencies:\n"
+			for _, dep := range issue.Dependencies {
+				depText += fmt.Sprintf("  %s → %s\n", dep.Type, dep.DependsOnID)
+			}
+			form.AddTextView("", depText, 0, len(issue.Dependencies)+1, false, false)
+		} else {
+			form.AddTextView("", "No dependencies", 0, 1, false, false)
+		}
+
+		// Add new dependency fields
+		var targetID, depType string
+		form.AddInputField("Add Dependency (Issue ID)", "", 20, nil, func(text string) {
+			targetID = text
+		})
+		form.AddDropDown("Dependency Type", []string{"blocks", "parent-child", "related", "discovered-from"}, 0, func(option string, index int) {
+			depType = option
+		})
+
+		// Add button
+		form.AddButton("Add Dependency", func() {
+			if targetID == "" {
+				statusBar.SetText("[red]Error: Issue ID required[-]")
+				return
+			}
+
+			// Validate target issue exists
+			if appState.GetIssueByID(targetID) == nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: Issue %s not found[-]", targetID))
+				return
+			}
+
+			issueID := issue.ID // Capture before potential refresh
+			cmd := fmt.Sprintf("bd dep add %s %s --type %s", issueID, targetID, depType)
+			log.Printf("BD COMMAND: Adding dependency: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Dependency add failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error adding dependency: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Dependency added successfully")
+				statusBar.SetText(fmt.Sprintf("[green]✓ Added %s dependency to %s[-]", depType, targetID))
+				pages.RemovePage("dependency_dialog")
+				app.SetFocus(issueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		})
+
+		// Remove dependency buttons
+		if len(issue.Dependencies) > 0 {
+			form.AddTextView("", "\nRemove Dependencies:", 0, 1, false, false)
+			for _, dep := range issue.Dependencies {
+				// Capture dep in closure
+				depToRemove := dep
+				buttonLabel := fmt.Sprintf("Remove %s → %s", depToRemove.Type, depToRemove.DependsOnID)
+				form.AddButton(buttonLabel, func() {
+					issueID := issue.ID
+					cmd := fmt.Sprintf("bd dep remove %s %s --type %s", issueID, depToRemove.DependsOnID, depToRemove.Type)
+					log.Printf("BD COMMAND: Removing dependency: %s", cmd)
+					output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+					if err != nil {
+						log.Printf("BD COMMAND ERROR: Dependency remove failed: %v, output: %s", err, string(output))
+						statusBar.SetText(fmt.Sprintf("[red]Error removing dependency: %v[-]", err))
+					} else {
+						log.Printf("BD COMMAND: Dependency removed successfully")
+						statusBar.SetText(fmt.Sprintf("[green]✓ Removed %s dependency to %s[-]", depToRemove.Type, depToRemove.DependsOnID))
+						pages.RemovePage("dependency_dialog")
+						app.SetFocus(issueList)
+						time.AfterFunc(500*time.Millisecond, func() {
+							refreshIssues(issueID)
+						})
+					}
+				})
+			}
+		}
+
+		// Close button
+		form.AddButton("Close", func() {
+			pages.RemovePage("dependency_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Manage Dependencies ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("dependency_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("dependency_dialog", modal, true, true)
+		app.SetFocus(form)
+	}
+
+	// Helper function to manage labels
+	showLabelDialog := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		form.AddTextView("Managing labels for", issue.ID+" - "+issue.Title, 0, 2, false, false)
+
+		// Show current labels
+		if len(issue.Labels) > 0 {
+			labelText := "Current Labels:\n  "
+			for i, label := range issue.Labels {
+				if i > 0 {
+					labelText += ", "
+				}
+				labelText += label
+			}
+			form.AddTextView("", labelText, 0, 2, false, false)
+		} else {
+			form.AddTextView("", "No labels", 0, 1, false, false)
+		}
+
+		// Add new label field
+		var newLabel string
+		form.AddInputField("Add Label", "", 30, nil, func(text string) {
+			newLabel = text
+		})
+
+		// Add button
+		form.AddButton("Add Label", func() {
+			trimmedLabel := strings.TrimSpace(newLabel)
+			if trimmedLabel == "" {
+				statusBar.SetText("[red]Error: Label cannot be empty[-]")
+				return
+			}
+
+			// Check if label already exists
+			for _, existing := range issue.Labels {
+				if existing == trimmedLabel {
+					statusBar.SetText(fmt.Sprintf("[red]Error: Label '%s' already exists[-]", trimmedLabel))
+					return
+				}
+			}
+
+			issueID := issue.ID // Capture before potential refresh
+			cmd := fmt.Sprintf("bd label %s %q", issueID, trimmedLabel)
+			log.Printf("BD COMMAND: Adding label: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Label add failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error adding label: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Label added successfully")
+				statusBar.SetText(fmt.Sprintf("[green]✓ Added label '%s'[-]", trimmedLabel))
+				pages.RemovePage("label_dialog")
+				app.SetFocus(issueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		})
+
+		// Remove label buttons
+		if len(issue.Labels) > 0 {
+			form.AddTextView("", "\nRemove Labels:", 0, 1, false, false)
+			for _, label := range issue.Labels {
+				// Capture label in closure
+				labelToRemove := label
+				buttonLabel := fmt.Sprintf("Remove '%s'", labelToRemove)
+				form.AddButton(buttonLabel, func() {
+					issueID := issue.ID
+					cmd := fmt.Sprintf("bd label %s --remove %q", issueID, labelToRemove)
+					log.Printf("BD COMMAND: Removing label: %s", cmd)
+					output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+					if err != nil {
+						log.Printf("BD COMMAND ERROR: Label remove failed: %v, output: %s", err, string(output))
+						statusBar.SetText(fmt.Sprintf("[red]Error removing label: %v[-]", err))
+					} else {
+						log.Printf("BD COMMAND: Label removed successfully")
+						statusBar.SetText(fmt.Sprintf("[green]✓ Removed label '%s'[-]", labelToRemove))
+						pages.RemovePage("label_dialog")
+						app.SetFocus(issueList)
+						time.AfterFunc(500*time.Millisecond, func() {
+							refreshIssues(issueID)
+						})
+					}
+				})
+			}
+		}
+
+		// Close button
+		form.AddButton("Close", func() {
+			pages.RemovePage("label_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Manage Labels ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("label_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("label_dialog", modal, true, true)
+		app.SetFocus(form)
+	}
+
+	// Helper function to show edit menu
+	showEditMenu := func() {
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		form.AddTextView("Editing", issue.ID+" - "+issue.Title, 0, 2, false, false)
+		form.AddButton("Edit Description", func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+			editFieldInEditor(issue, "description", issue.Description)
+		})
+		form.AddButton("Edit Design", func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+			editFieldInEditor(issue, "design", issue.Design)
+		})
+		form.AddButton("Edit Acceptance Criteria", func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+			editFieldInEditor(issue, "acceptance", issue.AcceptanceCriteria)
+		})
+		form.AddButton("Edit Notes", func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+			editFieldInEditor(issue, "notes", issue.Notes)
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Edit Issue Fields ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("edit_menu")
+			app.SetFocus(issueList)
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 2, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("edit_menu", modal, true, true)
+		app.SetFocus(form)
 	}
 
 	// Helper function to show issue creation dialog
@@ -1083,6 +1502,57 @@ func main() {
 			case 'c':
 				// Open comment dialog
 				showCommentDialog()
+				return nil
+			case 'e':
+				// Open edit menu for current issue
+				showEditMenu()
+				return nil
+			case 'D':
+				// Open dependency management dialog
+				showDependencyDialog()
+				return nil
+			case 'L':
+				// Open label management dialog
+				showLabelDialog()
+				return nil
+			case 'y':
+				// Yank (copy) issue ID to clipboard
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					err := clipboard.WriteAll(issue.ID)
+					if err != nil {
+						log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
+						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+					} else {
+						log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", issue.ID)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Copied %s to clipboard[-]", issue.ID))
+						// Clear message after 2 seconds
+						time.AfterFunc(2*time.Second, func() {
+							app.QueueUpdateDraw(func() {
+								statusBar.SetText(getStatusBarText())
+							})
+						})
+					}
+				}
+				return nil
+			case 'Y':
+				// Yank (copy) issue ID with title to clipboard
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					text := fmt.Sprintf("%s - %s", issue.ID, issue.Title)
+					err := clipboard.WriteAll(text)
+					if err != nil {
+						log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
+						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+					} else {
+						log.Printf("CLIPBOARD: Copied issue ID with title to clipboard: %s", text)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Copied '%s' to clipboard[-]", text))
+						// Clear message after 2 seconds
+						time.AfterFunc(2*time.Second, func() {
+							app.QueueUpdateDraw(func() {
+								statusBar.SetText(getStatusBarText())
+							})
+						})
+					}
+				}
 				return nil
 			case '?':
 				// Show help screen

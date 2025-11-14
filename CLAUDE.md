@@ -163,6 +163,231 @@ beads-tui/
 - **Command execution:** Executes `bd create` command with form data
 - **Auto-refresh:** Issue list refreshes 500ms after creation to show new issue
 
+## Editing UX Design (tui-qxy.1)
+
+This section documents the interaction patterns for editing issues in the TUI. The design follows vim-style conventions and reuses patterns from existing features.
+
+### Design Principles
+
+1. **Consistency with existing patterns:** Follow vim-style keybindings (j/k, gg/G, etc.)
+2. **Minimal context switching:** Use $EDITOR for text fields, modal dialogs for structured data
+3. **Safe defaults:** Require explicit confirmation for destructive operations
+4. **Immediate feedback:** Show status bar messages for all operations
+5. **Integration via bd CLI:** Use `bd` commands rather than direct DB writes (maintains single source of truth)
+
+### Keybinding Allocation
+
+**Current keybindings (reserved, DO NOT conflict):**
+- Navigation: `j`, `k`, `g`, `G`, `Tab`, `Enter`, `ESC`, arrows
+- Search: `/`, `n`, `N`
+- Quick updates: `0`-`4` (priority), `s` (status)
+- View controls: `t` (tree/list), `f` (filters), `m` (mouse), `r` (refresh)
+- Creation: `a` (add issue), `c` (add comment)
+- Help: `?`
+- Quit: `q`
+- Detail panel scrolling: `Ctrl-d`, `Ctrl-u`, `Ctrl-e`, `Ctrl-y`, `PageDown`, `PageUp`, `Home`, `End`
+
+**New keybindings for editing:**
+- `e` - **Edit menu** (shows modal with options: Description / Design / Acceptance / Notes / Cancel)
+- `D` - **Manage dependencies** (modal dialog for adding/removing blocks and parent-child relationships)
+- `L` - **Manage labels** (modal dialog for adding/removing labels)
+- `y` - **Yank issue ID to clipboard** (vim-style, copies current issue ID)
+- `Y` - **Yank issue ID with title** (copies "tui-xyz - Issue title" format)
+
+**Existing but enhanced:**
+- `c` - Add comment (already implemented, enhancing to support $EDITOR with template)
+
+### Text Field Editing with $EDITOR
+
+**Keybinding:** `e`
+
+**Behavior:**
+1. Press `e` on a selected issue
+2. Show modal menu with options:
+   - Edit Description
+   - Edit Design
+   - Edit Acceptance Criteria
+   - Edit Notes
+   - Cancel
+3. On selection:
+   - Write current field value to temp file (`/tmp/beads-tui-<field>-<issue-id>.md`)
+   - Pause TUI with `app.Suspend()`
+   - Spawn `$EDITOR` (fall back to `vim` if unset)
+   - Wait for editor to close
+   - Read temp file content
+   - Call `bd update <id> --description <content>` (or `--design`, `--acceptance`, `--notes`)
+   - Clean up temp file
+   - Resume TUI with `app.Draw()`
+   - Show confirmation in status bar: `[green]✓ Updated description for <issue-id>[-]`
+   - Trigger refresh after 500ms (preserves selection)
+
+**Editor command:** `$EDITOR /tmp/beads-tui-description-tui-xyz.md` (or use `vim` if `$EDITOR` unset)
+
+**Error handling:**
+- If `$EDITOR` executable not found: Show error in status bar, fall back to `vim`
+- If editor exits with non-zero code: Show error, ask "Save changes anyway? (y/n)"
+- If content is empty after editing: Ask "Clear this field? (y/n)"
+- If `bd update` fails: Show error message with bd output
+
+**Template format for empty fields:**
+```markdown
+# Edit <field-name> for <issue-id>
+# Lines starting with # are ignored
+# Save and exit to update, or exit without saving to cancel
+
+<existing content here, or empty>
+```
+
+**Implementation notes:**
+- Use `os/exec` to spawn editor
+- Strip comment lines (starting with `#`) before sending to bd
+- Properly escape content for shell (use heredoc or write to temp file and pass path)
+- Preserve cursor position in detail panel after refresh
+
+### Comment Creation with $EDITOR
+
+**Keybinding:** `c` (already implemented, enhancing)
+
+**Current behavior:** Shows modal dialog with textarea
+
+**Enhanced behavior (optional improvement for consistency):**
+1. Press `c` on a selected issue
+2. Spawn `$EDITOR` with template file
+3. Read comment after editor closes
+4. Call `bd comment <id> "<comment-text>"`
+
+**Template format:**
+```markdown
+# Add comment to <issue-id> - <title>
+# Lines starting with # are ignored
+# Save and exit to post comment, or exit without saving to cancel
+
+Your comment here...
+```
+
+**Note:** This is optional - the current modal dialog implementation works well. Consider this if users prefer $EDITOR workflow.
+
+### Dependency Management Dialog
+
+**Keybinding:** `D`
+
+**Behavior:**
+1. Press `D` on a selected issue
+2. Show modal dialog with two sections:
+   - **Current dependencies** (list with remove buttons)
+   - **Add new dependency** (input field + type selector)
+
+**Dialog layout:**
+```
+┌─────────────────────────────────────────────────┐
+│         Manage Dependencies for tui-xyz         │
+├─────────────────────────────────────────────────┤
+│ Current Dependencies:                           │
+│   [x] blocks     tui-abc  [Remove]              │
+│   [x] parent-child tui-def [Remove]             │
+│                                                  │
+│ Add New Dependency:                             │
+│   Issue ID: [____________]                      │
+│   Type: [blocks ▼] [parent-child] [related]     │
+│                    [discovered-from]            │
+│                                                  │
+│   [Add]  [Close]                                │
+└─────────────────────────────────────────────────┘
+```
+
+**Operations:**
+- **Add:** Call `bd dep add <issue-id> <target-id> --type <type>`
+- **Remove:** Call `bd dep remove <issue-id> <target-id> --type <type>`
+- Validate that target issue exists (search in current state)
+- Show error if target not found: `[red]Issue <id> not found[-]`
+- Trigger refresh after each add/remove operation
+
+**Implementation notes:**
+- Use `tview.Form` for the dialog
+- List dependencies from `issue.Dependencies`
+- Use checkboxes or list items with remove buttons
+- Add autocomplete for issue IDs (optional enhancement)
+- Show issue titles next to IDs for clarity
+
+### Label Management Dialog
+
+**Keybinding:** `L`
+
+**Behavior:**
+1. Press `L` on a selected issue
+2. Show modal dialog with current labels and add/remove interface
+
+**Dialog layout:**
+```
+┌─────────────────────────────────────────────────┐
+│         Manage Labels for tui-xyz               │
+├─────────────────────────────────────────────────┤
+│ Current Labels:                                 │
+│   [ui] [x]    [bug] [x]    [urgent] [x]        │
+│                                                  │
+│ Add Label:                                       │
+│   [____________]  [Add]                         │
+│                                                  │
+│   [Close]                                        │
+└─────────────────────────────────────────────────┘
+```
+
+**Operations:**
+- **Add:** Call `bd label <issue-id> <label-name>`
+- **Remove:** Call `bd label <issue-id> --remove <label-name>`
+- Trim whitespace from label names
+- Prevent duplicate labels (check before adding)
+- Show available labels from other issues (optional autocomplete)
+
+**Implementation notes:**
+- Use `tview.Form` for the dialog
+- Display labels as chips/tags with [x] buttons
+- Input field for new label name
+- Consider color-coding labels (enhancement)
+
+### Clipboard Integration
+
+**Keybindings:** `y` (yank ID), `Y` (yank ID with title)
+
+**Behavior:**
+- Press `y` on selected issue: Copy issue ID to clipboard (e.g., `tui-xyz`)
+- Press `Y` on selected issue: Copy ID with title (e.g., `tui-xyz - Build beads-tui`)
+- Show confirmation: `[green]✓ Copied tui-xyz to clipboard[-]`
+- Clear message after 2 seconds
+
+**Use cases:**
+- Quick reference for adding dependencies
+- Pasting into commit messages
+- Sharing issue IDs in chat/docs
+
+**Implementation:**
+- Use `github.com/atotto/clipboard` library (already imported)
+- Call `clipboard.WriteAll(issue.ID)` or `clipboard.WriteAll(fmt.Sprintf("%s - %s", issue.ID, issue.Title))`
+- Handle errors gracefully (show error in status bar if clipboard unavailable)
+- Cross-platform support (Linux/xclip, macOS/pbcopy, Windows/clip)
+
+**Note:** Clipboard already works for clicking issue ID in detail panel (line 384-415), extend this to keybindings
+
+### Implementation Order
+
+1. **tui-qxy.1** (this task) - Document UX design ✓
+2. **tui-qxy.2** - Implement text field editor with $EDITOR (highest priority)
+3. **tui-qxy.3** - Enhance comment creation with $EDITOR (optional)
+4. **tui-qxy.4** - Add dependency management dialog
+5. **tui-qxy.5** - Add label management dialog
+6. **tui-qxy.7** - Add clipboard yank keybindings
+7. **tui-qxy.8** - Write comprehensive tests
+
+### Success Criteria
+
+- Users can edit all text fields without leaving TUI
+- $EDITOR integration works with common editors (vim, nano, emacs, vscode --wait)
+- TUI properly suspends/resumes without corruption
+- All bd commands execute successfully with proper error handling
+- Status bar provides clear feedback for all operations
+- Selection is preserved after updates
+- No keybinding conflicts with existing features
+
 ### Package Responsibilities
 
 **`cmd/beads-tui/main.go`** - TUI application
