@@ -466,3 +466,264 @@ func TestTreeViewExcludesClosedIssues(t *testing.T) {
 		t.Errorf("Expected root to be test-1, got %s", treeNodes[0].Issue.ID)
 	}
 }
+
+func TestFilterByPriority(t *testing.T) {
+	state := New()
+
+	issues := []*parser.Issue{
+		{ID: "test-1", Title: "P0 Issue", Status: parser.StatusOpen, Priority: 0, IssueType: parser.TypeBug, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-2", Title: "P1 Issue", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeTask, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-3", Title: "P2 Issue", Status: parser.StatusOpen, Priority: 2, IssueType: parser.TypeFeature, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	}
+
+	state.LoadIssues(issues)
+
+	// Initially no filters, should get all 3
+	if len(state.GetReadyIssues()) != 3 {
+		t.Errorf("Expected 3 ready issues with no filter, got %d", len(state.GetReadyIssues()))
+	}
+
+	// Filter for P0 only
+	state.TogglePriorityFilter(0)
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 1 {
+		t.Errorf("Expected 1 issue with P0 filter, got %d", len(readyIssues))
+	}
+	if readyIssues[0].Priority != 0 {
+		t.Errorf("Expected priority 0, got %d", readyIssues[0].Priority)
+	}
+
+	// Add P1 to filter
+	state.TogglePriorityFilter(1)
+	readyIssues = state.GetReadyIssues()
+	if len(readyIssues) != 2 {
+		t.Errorf("Expected 2 issues with P0,P1 filter, got %d", len(readyIssues))
+	}
+
+	// Toggle P0 off
+	state.TogglePriorityFilter(0)
+	readyIssues = state.GetReadyIssues()
+	if len(readyIssues) != 1 {
+		t.Errorf("Expected 1 issue with P1 filter, got %d", len(readyIssues))
+	}
+	if readyIssues[0].Priority != 1 {
+		t.Errorf("Expected priority 1, got %d", readyIssues[0].Priority)
+	}
+
+	// Clear all filters
+	state.ClearAllFilters()
+	if len(state.GetReadyIssues()) != 3 {
+		t.Errorf("Expected 3 ready issues after clearing filters, got %d", len(state.GetReadyIssues()))
+	}
+}
+
+func TestFilterByType(t *testing.T) {
+	state := New()
+
+	issues := []*parser.Issue{
+		{ID: "test-1", Title: "Bug", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeBug, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-2", Title: "Feature", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeFeature, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-3", Title: "Task", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeTask, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	}
+
+	state.LoadIssues(issues)
+
+	// Filter for bugs only
+	state.ToggleTypeFilter(parser.TypeBug)
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 1 {
+		t.Errorf("Expected 1 bug, got %d", len(readyIssues))
+	}
+	if readyIssues[0].IssueType != parser.TypeBug {
+		t.Errorf("Expected type bug, got %s", readyIssues[0].IssueType)
+	}
+
+	// Add features
+	state.ToggleTypeFilter(parser.TypeFeature)
+	readyIssues = state.GetReadyIssues()
+	if len(readyIssues) != 2 {
+		t.Errorf("Expected 2 issues (bug+feature), got %d", len(readyIssues))
+	}
+}
+
+func TestFilterByStatus(t *testing.T) {
+	state := New()
+
+	issues := []*parser.Issue{
+		{ID: "test-1", Title: "Open", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeTask, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-2", Title: "In Progress", Status: parser.StatusInProgress, Priority: 1, IssueType: parser.TypeTask, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-3", Title: "Closed", Status: parser.StatusClosed, Priority: 1, IssueType: parser.TypeTask, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	}
+
+	state.LoadIssues(issues)
+
+	// Filter for in_progress only
+	state.ToggleStatusFilter(parser.StatusInProgress)
+	inProgressIssues := state.GetInProgressIssues()
+	if len(inProgressIssues) != 1 {
+		t.Errorf("Expected 1 in_progress issue, got %d", len(inProgressIssues))
+	}
+
+	// Filter should exclude open and closed
+	if len(state.GetReadyIssues()) != 0 {
+		t.Errorf("Expected 0 ready issues with in_progress filter, got %d", len(state.GetReadyIssues()))
+	}
+	if len(state.GetClosedIssues()) != 0 {
+		t.Errorf("Expected 0 closed issues with in_progress filter, got %d", len(state.GetClosedIssues()))
+	}
+}
+
+func TestCombinedFilters(t *testing.T) {
+	state := New()
+
+	issues := []*parser.Issue{
+		{ID: "test-1", Title: "P0 Bug", Status: parser.StatusOpen, Priority: 0, IssueType: parser.TypeBug, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-2", Title: "P0 Feature", Status: parser.StatusOpen, Priority: 0, IssueType: parser.TypeFeature, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-3", Title: "P1 Bug", Status: parser.StatusOpen, Priority: 1, IssueType: parser.TypeBug, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "test-4", Title: "P1 Feature", Status: parser.StatusInProgress, Priority: 1, IssueType: parser.TypeFeature, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	}
+
+	state.LoadIssues(issues)
+
+	// Filter for P0 bugs
+	state.TogglePriorityFilter(0)
+	state.ToggleTypeFilter(parser.TypeBug)
+
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 1 {
+		t.Errorf("Expected 1 P0 bug, got %d", len(readyIssues))
+	}
+	if readyIssues[0].ID != "test-1" {
+		t.Errorf("Expected test-1, got %s", readyIssues[0].ID)
+	}
+
+	// Add P1 to priority filter - should get both bugs
+	state.TogglePriorityFilter(1)
+	readyIssues = state.GetReadyIssues()
+	if len(readyIssues) != 2 {
+		t.Errorf("Expected 2 bugs (P0+P1), got %d", len(readyIssues))
+	}
+
+	// Add status filter for in_progress - should get nothing from ready (test-4 is in progress, but it's a feature)
+	state.ToggleStatusFilter(parser.StatusInProgress)
+	readyIssues = state.GetReadyIssues()
+	if len(readyIssues) != 0 {
+		t.Errorf("Expected 0 ready issues with in_progress status filter, got %d", len(readyIssues))
+	}
+}
+
+func TestFilterHelpers(t *testing.T) {
+	state := New()
+
+	// Initially no filters
+	if state.HasActiveFilters() {
+		t.Error("Expected no active filters initially")
+	}
+
+	if state.IsPriorityFiltered(1) {
+		t.Error("Expected priority 1 not filtered initially")
+	}
+
+	if state.IsTypeFiltered(parser.TypeBug) {
+		t.Error("Expected bug type not filtered initially")
+	}
+
+	if state.IsStatusFiltered(parser.StatusOpen) {
+		t.Error("Expected open status not filtered initially")
+	}
+
+	// Add some filters
+	state.TogglePriorityFilter(1)
+	state.ToggleTypeFilter(parser.TypeBug)
+	state.ToggleStatusFilter(parser.StatusOpen)
+
+	if !state.HasActiveFilters() {
+		t.Error("Expected active filters after toggling")
+	}
+
+	if !state.IsPriorityFiltered(1) {
+		t.Error("Expected priority 1 to be filtered")
+	}
+
+	if !state.IsTypeFiltered(parser.TypeBug) {
+		t.Error("Expected bug type to be filtered")
+	}
+
+	if !state.IsStatusFiltered(parser.StatusOpen) {
+		t.Error("Expected open status to be filtered")
+	}
+
+	// Clear all
+	state.ClearAllFilters()
+
+	if state.HasActiveFilters() {
+		t.Error("Expected no active filters after clearing")
+	}
+}
+
+func TestGetActiveFilters(t *testing.T) {
+	state := New()
+
+	// No filters
+	filterStr := state.GetActiveFilters()
+	if filterStr != "" {
+		t.Errorf("Expected empty filter string, got '%s'", filterStr)
+	}
+
+	// Add priority filters
+	state.TogglePriorityFilter(0)
+	state.TogglePriorityFilter(1)
+	filterStr = state.GetActiveFilters()
+	if filterStr != "Priority: P0,P1" {
+		t.Errorf("Expected 'Priority: P0,P1', got '%s'", filterStr)
+	}
+
+	// Add type filter
+	state.ToggleTypeFilter(parser.TypeBug)
+	filterStr = state.GetActiveFilters()
+	if filterStr != "Priority: P0,P1 | Type: bug" {
+		t.Errorf("Expected 'Priority: P0,P1 | Type: bug', got '%s'", filterStr)
+	}
+
+	// Add status filter
+	state.ToggleStatusFilter(parser.StatusOpen)
+	filterStr = state.GetActiveFilters()
+	if filterStr != "Priority: P0,P1 | Type: bug | Status: open" {
+		t.Errorf("Expected full filter string, got '%s'", filterStr)
+	}
+}
+
+func TestSelectedIssue(t *testing.T) {
+	state := New()
+
+	issue := &parser.Issue{
+		ID:        "test-1",
+		Title:     "Test Issue",
+		Status:    parser.StatusOpen,
+		Priority:  1,
+		IssueType: parser.TypeTask,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	// Initially no selection
+	if state.GetSelectedIssue() != nil {
+		t.Error("Expected no selected issue initially")
+	}
+
+	// Set selection
+	state.SetSelectedIssue(issue)
+	selected := state.GetSelectedIssue()
+	if selected == nil {
+		t.Fatal("Expected selected issue to be set")
+	}
+	if selected.ID != "test-1" {
+		t.Errorf("Expected selected issue ID 'test-1', got '%s'", selected.ID)
+	}
+
+	// Clear selection
+	state.SetSelectedIssue(nil)
+	if state.GetSelectedIssue() != nil {
+		t.Error("Expected no selected issue after clearing")
+	}
+}
