@@ -829,6 +829,8 @@ func main() {
 [cyan::b]Detail Panel Scrolling (when focused)[-::-]
   Ctrl-d      Scroll down half page
   Ctrl-u      Scroll up half page
+  Ctrl-f      Scroll down full page (vim)
+  Ctrl-b      Scroll up full page (vim)
   Ctrl-e      Scroll down one line
   Ctrl-y      Scroll up one line
   PageDown    Scroll down full page
@@ -1652,6 +1654,14 @@ func main() {
 			case tcell.KeyCtrlY:
 				// Scroll up one line
 				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyCtrlF:
+				// Scroll down full page (vim style)
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyPgDn, 0, tcell.ModNone), nil)
+				return nil
+			case tcell.KeyCtrlB:
+				// Scroll up full page (vim style)
+				detailPanel.InputHandler()(tcell.NewEventKey(tcell.KeyPgUp, 0, tcell.ModNone), nil)
 				return nil
 			case tcell.KeyPgDn:
 				// Page down
