@@ -208,7 +208,8 @@ func main() {
 	})
 
 	// Run application
-	if err := app.SetRoot(flex, true).EnableMouse(true).Run(); err != nil {
+	// Note: Mouse disabled to allow terminal text selection (tui-p62)
+	if err := app.SetRoot(flex, true).Run(); err != nil {
 		panic(err)
 	}
 }
