@@ -48,7 +48,63 @@ func main() {
 	// Track mapping from list index to issue
 	indexToIssue := make(map[int]*parser.Issue)
 
-	// Function to load and display issues
+	// Helper function to populate issue list from state
+	populateIssueList := func() {
+		// Clear and rebuild issue list
+		issueList.Clear()
+		indexToIssue = make(map[int]*parser.Issue)
+		currentIndex := 0
+
+		// Add ready issues
+		readyIssues := appState.GetReadyIssues()
+		if len(readyIssues) > 0 {
+			issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+			currentIndex++
+
+			for _, issue := range readyIssues {
+				priorityColor := getPriorityColor(issue.Priority)
+				text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
+					priorityColor, issue.ID, issue.Priority, issue.Title)
+				issueList.AddItem(text, "", 0, nil)
+				indexToIssue[currentIndex] = issue
+				currentIndex++
+			}
+		}
+
+		// Add blocked issues
+		blockedIssues := appState.GetBlockedIssues()
+		if len(blockedIssues) > 0 {
+			issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
+			currentIndex++
+
+			for _, issue := range blockedIssues {
+				priorityColor := getPriorityColor(issue.Priority)
+				text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
+					priorityColor, issue.ID, issue.Priority, issue.Title)
+				issueList.AddItem(text, "", 0, nil)
+				indexToIssue[currentIndex] = issue
+				currentIndex++
+			}
+		}
+
+		// Add in-progress issues
+		inProgressIssues := appState.GetInProgressIssues()
+		if len(inProgressIssues) > 0 {
+			issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+			currentIndex++
+
+			for _, issue := range inProgressIssues {
+				priorityColor := getPriorityColor(issue.Priority)
+				text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
+					priorityColor, issue.ID, issue.Priority, issue.Title)
+				issueList.AddItem(text, "", 0, nil)
+				indexToIssue[currentIndex] = issue
+				currentIndex++
+			}
+		}
+	}
+
+	// Function to load and display issues (for async updates after app starts)
 	refreshIssues := func() {
 		// Parse issues
 		issues, err := parser.ParseFile(jsonlPath)
@@ -69,63 +125,20 @@ func main() {
 			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh, Enter for details]",
 				beadsDir, len(issues)))
 
-			// Clear and rebuild issue list
-			issueList.Clear()
-			indexToIssue = make(map[int]*parser.Issue)
-			currentIndex := 0
-
-			// Add ready issues
-			readyIssues := appState.GetReadyIssues()
-			if len(readyIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
-				currentIndex++
-
-				for _, issue := range readyIssues {
-					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
-					issueList.AddItem(text, "", 0, nil)
-					indexToIssue[currentIndex] = issue
-					currentIndex++
-				}
-			}
-
-			// Add blocked issues
-			blockedIssues := appState.GetBlockedIssues()
-			if len(blockedIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
-				currentIndex++
-
-				for _, issue := range blockedIssues {
-					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
-					issueList.AddItem(text, "", 0, nil)
-					indexToIssue[currentIndex] = issue
-					currentIndex++
-				}
-			}
-
-			// Add in-progress issues
-			inProgressIssues := appState.GetInProgressIssues()
-			if len(inProgressIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
-				currentIndex++
-
-				for _, issue := range inProgressIssues {
-					priorityColor := getPriorityColor(issue.Priority)
-					text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
-						priorityColor, issue.ID, issue.Priority, issue.Title)
-					issueList.AddItem(text, "", 0, nil)
-					indexToIssue[currentIndex] = issue
-					currentIndex++
-				}
-			}
+			populateIssueList()
 		})
 	}
 
-	// Initial load
-	refreshIssues()
+	// Initial load (before app starts, no QueueUpdateDraw)
+	issues, err := parser.ParseFile(jsonlPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing issues: %v\n", err)
+		os.Exit(1)
+	}
+	appState.LoadIssues(issues)
+	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh, Enter for details]",
+		beadsDir, len(issues)))
+	populateIssueList()
 
 	// Set up filesystem watcher
 	fileWatcher, err := watcher.New(jsonlPath, 200*time.Millisecond, refreshIssues)
