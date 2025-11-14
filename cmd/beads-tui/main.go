@@ -1153,7 +1153,7 @@ func main() {
   Tb          Set type to bug
   Tt          Set type to task
   Te          Set type to epic
-  Td          Set type to chore (doc/maintenance)
+  Tc/Td       Set type to chore (doc/maintenance)
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
@@ -2202,6 +2202,88 @@ func main() {
 			}
 			return event
 		case tcell.KeyRune:
+			// Handle multi-key sequences FIRST before processing individual keys
+			// This prevents conflicts with single-key handlers
+
+			// Handle status shortcuts (S + second char)
+			if lastKeyWasS {
+				var newStatus string
+				switch event.Rune() {
+				case 'o':
+					newStatus = "open"
+				case 'i':
+					newStatus = "in_progress"
+				case 'b':
+					newStatus = "blocked"
+				case 'c':
+					newStatus = "closed"
+				default:
+					// Invalid second key, reset and fall through
+					lastKeyWasS = false
+					statusBar.SetText(getStatusBarText())
+					return nil
+				}
+
+				// Execute status update
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					issueID := issue.ID
+					cmd := fmt.Sprintf("bd update %s --status %s", issueID, newStatus)
+					log.Printf("BD COMMAND: Executing status update (S%c): %s", event.Rune(), cmd)
+					err := exec.Command("sh", "-c", cmd).Run()
+					if err != nil {
+						statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
+					} else {
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issueID, newStatus))
+						time.AfterFunc(500*time.Millisecond, func() {
+							refreshIssues(issueID)
+						})
+					}
+				}
+				lastKeyWasS = false
+				return nil
+			}
+
+			// Handle type shortcuts (T + second char)
+			if lastKeyWasT {
+				var newType string
+				switch event.Rune() {
+				case 'f':
+					newType = "feature"
+				case 'b':
+					newType = "bug"
+				case 't':
+					newType = "task"
+				case 'e':
+					newType = "epic"
+				case 'c', 'd':  // Both Tc and Td map to chore
+					newType = "chore"
+				default:
+					// Invalid second key, reset and fall through
+					lastKeyWasT = false
+					statusBar.SetText(getStatusBarText())
+					return nil
+				}
+
+				// Execute type update
+				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+					issueID := issue.ID
+					cmd := fmt.Sprintf("bd update %s --type %s", issueID, newType)
+					log.Printf("BD COMMAND: Executing type update (T%c): %s", event.Rune(), cmd)
+					err := exec.Command("sh", "-c", cmd).Run()
+					if err != nil {
+						statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
+					} else {
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issueID, newType))
+						time.AfterFunc(500*time.Millisecond, func() {
+							refreshIssues(issueID)
+						})
+					}
+				}
+				lastKeyWasT = false
+				return nil
+			}
+
+			// Normal single-key handling
 			switch event.Rune() {
 			case 'q':
 				app.Stop()
@@ -2246,29 +2328,10 @@ func main() {
 				prevSearchMatch()
 				return nil
 			case 't':
-				// Check if this is the second character of a two-character shortcut (Tt = task)
-				if lastKeyWasT {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "task")
-						log.Printf("BD COMMAND: Executing type update (Tt): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to task[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasT = false
-					return nil
-				}
-				// First 't' press - mark for potential two-character shortcut
+				// Initiate type shortcut sequence
 				lastKeyWasT = true
 				lastKeyWasS = false
-				statusBar.SetText("[yellow]Type shortcut: f/b/t/e/d (chore)[-]")
+				statusBar.SetText("[yellow]Type shortcut: f/b/t/e/c/d (chore)[-]")
 				// Reset after 2 seconds if no second key
 				time.AfterFunc(2*time.Second, func() {
 					app.QueueUpdateDraw(func() {
@@ -2296,26 +2359,7 @@ func main() {
 				showCreateIssueDialog()
 				return nil
 			case 'e':
-				// Handle two-character type shortcut: Te (epic)
-				if lastKeyWasT {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "epic")
-						log.Printf("BD COMMAND: Executing type update (Te): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to epic[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasT = false
-					return nil
-				}
-				// Open edit form for current issue
+				// Edit issue fields
 				showEditForm()
 				return nil
 			case 'D':
@@ -2402,49 +2446,9 @@ func main() {
 				showHelpScreen()
 				return nil
 			case 'f':
-				// Handle two-character type shortcut: Tf (feature)
-				if lastKeyWasT {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "feature")
-						log.Printf("BD COMMAND: Executing type update (Tf): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to feature[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasT = false
-					return nil
-				}
 				// Show quick filter
 				showQuickFilter()
 				return nil
-			case 'd':
-				// Handle two-character type shortcut: Td (chore - documentation/chore work)
-				if lastKeyWasT {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "chore")
-						log.Printf("BD COMMAND: Executing type update (Td): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to chore[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasT = false
-					return nil
-				}
-				return event
 			case 'S':
 				// Show stats dashboard
 				showStatsOverlay()
@@ -2474,30 +2478,7 @@ func main() {
 				}
 				return nil
 			case 's':
-				// Check if this is the second character of a two-character shortcut
-				if lastKeyWasS {
-					// Handle two-character status shortcuts
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						// Update status via bd command
-						cmd := fmt.Sprintf("bd update %s --status %s", issueID, "in_progress")
-						log.Printf("BD COMMAND: Executing status update (Si): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							log.Printf("BD COMMAND ERROR: Status update failed: %v", err)
-							statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
-						} else {
-							log.Printf("BD COMMAND: Status update successful for %s -> in_progress", issueID)
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to in_progress[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasS = false
-					return nil
-				}
-				// First 's' press - mark for potential two-character shortcut
+				// Initiate status shortcut sequence
 				lastKeyWasS = true
 				lastKeyWasT = false
 				statusBar.SetText("[yellow]Status shortcut: o/i/b/c[-]")
@@ -2511,110 +2492,8 @@ func main() {
 					})
 				})
 				return nil
-			case 'o':
-				// Handle two-character status shortcut: So (open)
-				if lastKeyWasS {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --status %s", issueID, "open")
-						log.Printf("BD COMMAND: Executing status update (So): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to open[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasS = false
-					return nil
-				}
-				return event
-			case 'i':
-				// Handle two-character status shortcut: Si (in_progress)
-				if lastKeyWasS {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --status %s", issueID, "in_progress")
-						log.Printf("BD COMMAND: Executing status update (Si): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to in_progress[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasS = false
-					return nil
-				}
-				return event
-			case 'b':
-				// Handle two-character status shortcut: Sb (blocked)
-				if lastKeyWasS {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --status %s", issueID, "blocked")
-						log.Printf("BD COMMAND: Executing status update (Sb): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to blocked[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasS = false
-					return nil
-				}
-				// Handle two-character type shortcut: Tb (bug)
-				if lastKeyWasT {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --type %s", issueID, "bug")
-						log.Printf("BD COMMAND: Executing type update (Tb): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating type: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to bug[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasT = false
-					return nil
-				}
-				return event
 			case 'c':
-				// Handle two-character status shortcut: Sc (closed)
-				if lastKeyWasS {
-					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
-						issueID := issue.ID
-						cmd := fmt.Sprintf("bd update %s --status %s", issueID, "closed")
-						log.Printf("BD COMMAND: Executing status update (Sc): %s", cmd)
-						err := exec.Command("sh", "-c", cmd).Run()
-						if err != nil {
-							statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
-						} else {
-							statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to closed[-]", issueID))
-							time.AfterFunc(500*time.Millisecond, func() {
-								refreshIssues(issueID)
-							})
-						}
-					}
-					lastKeyWasS = false
-					return nil
-				}
-				// If not in two-char mode, fall through to show comment dialog
-				// Open comment dialog
+				// Add comment to issue
 				showCommentDialog()
 				return nil
 			default:
