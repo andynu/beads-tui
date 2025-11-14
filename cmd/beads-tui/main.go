@@ -290,6 +290,13 @@ func main() {
 		if len(preserveIssueID) > 0 {
 			targetIssueID = preserveIssueID[0]
 			log.Printf("REFRESH: Will attempt to preserve selection on issue: %s", targetIssueID)
+		} else {
+			// No explicit issue ID provided, try to preserve current selection
+			currentIndex := issueList.GetCurrentItem()
+			if currentIssue, ok := indexToIssue[currentIndex]; ok {
+				targetIssueID = currentIssue.ID
+				log.Printf("REFRESH: Auto-preserving current selection: %s", targetIssueID)
+			}
 		}
 
 		// Load issues from SQLite with timeout
