@@ -96,6 +96,11 @@ beads-tui/
 
 **Mouse mode disabled:** Mouse is intentionally disabled to allow terminal text selection (see cmd/beads-tui/main.go:212).
 
+**View modes:** The TUI supports two view modes:
+- **List View (default):** Issues grouped by status (ready/blocked/in-progress)
+- **Tree View:** Issues displayed as dependency hierarchy with ASCII tree characters
+- Toggle between modes with the 't' key
+
 ### Package Responsibilities
 
 **`cmd/beads-tui/main.go`** - TUI application
@@ -114,6 +119,8 @@ beads-tui/
 - Categorizes issues into ready/blocked/in-progress/closed
 - Builds dependency graph to detect blocking relationships
 - Provides getters for filtered issue lists
+- Manages view mode state (list vs tree)
+- Builds tree structure from parent-child and blocks dependencies
 - No UI concerns - pure business logic
 
 **`internal/watcher/`** - File monitoring
@@ -171,6 +178,32 @@ An issue is "blocked" if:
 - It has status="blocked", OR
 - It has a "blocks" dependency where the blocking issue is not closed
 
+### Tree View Algorithm
+
+The tree view visualizes issue dependencies as a hierarchical structure:
+
+**Building the tree** (from `internal/state/state.go:201-288`):
+1. Build maps of parent→children (from parent-child dependencies) and blocker→blocked (from blocks dependencies)
+2. Find root nodes: issues with no incoming parent-child or blocks dependencies
+3. Recursively build tree from roots, adding both children and blocked issues
+4. Skip closed issues in tree view
+5. Use cycle detection to prevent infinite recursion
+
+**Rendering the tree** (from `cmd/beads-tui/main.go:70-119`):
+- Uses ASCII tree characters: `├──`, `└──`, `│`
+- Status indicators: `●` (open), `○` (blocked), `◆` (in-progress)
+- Color-coded by priority and status
+- Hierarchical indentation based on depth
+
+**Example tree output:**
+```
+DEPENDENCY TREE
+[●] tui-ywv [P1] Build beads-tui: Terminal UI for beads issue tracker
+├── [◆] tui-bne [P2] Add tree view mode for issue dependency visualization
+├── [●] tui-hxu [P2] Add filtering capabilities (priority, type, status)
+└── [●] tui-79b [P2] Write tests for core TUI components
+```
+
 ## Common Development Tasks
 
 ### Adding a New Filter or View
@@ -188,11 +221,17 @@ An issue is "blocked" if:
 
 ### Changing Keybindings
 
-Update `app.SetInputCapture()` in `cmd/beads-tui/main.go:188-208`. Current bindings:
+Update `app.SetInputCapture()` in `cmd/beads-tui/main.go`. Current bindings:
 - `q`: Quit
 - `r`: Manual refresh
 - `j`: Down (simulates arrow key)
 - `k`: Up (simulates arrow key)
+- `t`: Toggle between list and tree view
+- `g` + `g`: Jump to top
+- `G`: Jump to bottom
+- `/`: Start search mode
+- `n`: Next search result
+- `N`: Previous search result
 - `Enter`: Handled by tview list (selection)
 
 ### Debugging Watcher Issues

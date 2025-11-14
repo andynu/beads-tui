@@ -226,3 +226,243 @@ func TestGetIssueByID(t *testing.T) {
 		t.Error("Expected nil for non-existent issue")
 	}
 }
+
+func TestTreeViewMode(t *testing.T) {
+	state := New()
+
+	// Initially should be in list view
+	if state.GetViewMode() != ViewList {
+		t.Errorf("Expected ViewList mode, got %v", state.GetViewMode())
+	}
+
+	// Toggle to tree view
+	mode := state.ToggleViewMode()
+	if mode != ViewTree {
+		t.Errorf("Expected ViewTree after toggle, got %v", mode)
+	}
+	if state.GetViewMode() != ViewTree {
+		t.Errorf("Expected ViewTree mode, got %v", state.GetViewMode())
+	}
+
+	// Toggle back to list view
+	mode = state.ToggleViewMode()
+	if mode != ViewList {
+		t.Errorf("Expected ViewList after second toggle, got %v", mode)
+	}
+}
+
+func TestBuildDependencyTree(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	// Create a simple parent-child tree:
+	// parent (test-1)
+	//   ├── child1 (test-2)
+	//   └── child2 (test-3)
+	//       └── grandchild (test-4)
+	issues := []*parser.Issue{
+		{
+			ID:        "test-1",
+			Title:     "Parent Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeEpic,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "test-2",
+			Title:     "Child Issue 1",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-2",
+					DependsOnID: "test-1",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "test-3",
+			Title:     "Child Issue 2",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-3",
+					DependsOnID: "test-1",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "test-4",
+			Title:     "Grandchild Issue",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-4",
+					DependsOnID: "test-3",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+	}
+
+	state.LoadIssues(issues)
+	state.SetViewMode(ViewTree)
+
+	// Should have 1 root node (test-1)
+	treeNodes := state.GetTreeNodes()
+	if len(treeNodes) != 1 {
+		t.Errorf("Expected 1 root node, got %d", len(treeNodes))
+	}
+
+	if treeNodes[0].Issue.ID != "test-1" {
+		t.Errorf("Expected root to be test-1, got %s", treeNodes[0].Issue.ID)
+	}
+
+	// Root should have 2 children
+	if len(treeNodes[0].Children) != 2 {
+		t.Errorf("Expected root to have 2 children, got %d", len(treeNodes[0].Children))
+	}
+
+	// Find test-3 among children
+	var test3Node *TreeNode
+	for _, child := range treeNodes[0].Children {
+		if child.Issue.ID == "test-3" {
+			test3Node = child
+			break
+		}
+	}
+
+	if test3Node == nil {
+		t.Fatal("Could not find test-3 in children")
+	}
+
+	// test-3 should have 1 child (test-4)
+	if len(test3Node.Children) != 1 {
+		t.Errorf("Expected test-3 to have 1 child, got %d", len(test3Node.Children))
+	}
+
+	if test3Node.Children[0].Issue.ID != "test-4" {
+		t.Errorf("Expected grandchild to be test-4, got %s", test3Node.Children[0].Issue.ID)
+	}
+}
+
+func TestTreeViewWithBlockedIssues(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	// Create a tree with blocking dependencies:
+	// blocker (test-1)
+	//   └── blocked (test-2) [blocked by test-1]
+	issues := []*parser.Issue{
+		{
+			ID:        "test-1",
+			Title:     "Blocker Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "test-2",
+			Title:     "Blocked Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-2",
+					DependsOnID: "test-1",
+					Type:        parser.DepBlocks,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+	}
+
+	state.LoadIssues(issues)
+	state.SetViewMode(ViewTree)
+
+	treeNodes := state.GetTreeNodes()
+	if len(treeNodes) != 1 {
+		t.Errorf("Expected 1 root node, got %d", len(treeNodes))
+	}
+
+	if treeNodes[0].Issue.ID != "test-1" {
+		t.Errorf("Expected root to be test-1, got %s", treeNodes[0].Issue.ID)
+	}
+
+	// Blocker should have the blocked issue as child
+	if len(treeNodes[0].Children) != 1 {
+		t.Errorf("Expected blocker to have 1 child, got %d", len(treeNodes[0].Children))
+	}
+
+	if treeNodes[0].Children[0].Issue.ID != "test-2" {
+		t.Errorf("Expected child to be test-2, got %s", treeNodes[0].Children[0].Issue.ID)
+	}
+}
+
+func TestTreeViewExcludesClosedIssues(t *testing.T) {
+	state := New()
+	now := time.Now()
+	closedAt := now.Add(-1 * time.Hour)
+
+	issues := []*parser.Issue{
+		{
+			ID:        "test-1",
+			Title:     "Open Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "test-2",
+			Title:     "Closed Issue",
+			Status:    parser.StatusClosed,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			ClosedAt:  &closedAt,
+		},
+	}
+
+	state.LoadIssues(issues)
+	state.SetViewMode(ViewTree)
+
+	treeNodes := state.GetTreeNodes()
+	// Only test-1 should appear (test-2 is closed)
+	if len(treeNodes) != 1 {
+		t.Errorf("Expected 1 root node (closed excluded), got %d", len(treeNodes))
+	}
+
+	if treeNodes[0].Issue.ID != "test-1" {
+		t.Errorf("Expected root to be test-1, got %s", treeNodes[0].Issue.ID)
+	}
+}

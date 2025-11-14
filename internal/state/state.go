@@ -16,6 +16,8 @@ type State struct {
 	selectedIssue    *parser.Issue
 	filterMode       FilterMode
 	searchQuery      string
+	viewMode         ViewMode
+	treeNodes        []*TreeNode
 }
 
 // FilterMode represents different filtering options
@@ -30,11 +32,27 @@ const (
 	FilterByType
 )
 
+// ViewMode represents different view layouts
+type ViewMode int
+
+const (
+	ViewList ViewMode = iota
+	ViewTree
+)
+
+// TreeNode represents a node in the dependency tree
+type TreeNode struct {
+	Issue    *parser.Issue
+	Children []*TreeNode
+	Depth    int
+}
+
 // New creates a new application state
 func New() *State {
 	return &State{
 		issuesByID: make(map[string]*parser.Issue),
 		filterMode: FilterAll,
+		viewMode:   ViewList,
 	}
 }
 
@@ -150,4 +168,121 @@ func (s *State) SetSelectedIssue(issue *parser.Issue) {
 // GetSelectedIssue returns the currently selected issue
 func (s *State) GetSelectedIssue() *parser.Issue {
 	return s.selectedIssue
+}
+
+// SetViewMode sets the current view mode
+func (s *State) SetViewMode(mode ViewMode) {
+	s.viewMode = mode
+	if mode == ViewTree {
+		s.buildDependencyTree()
+	}
+}
+
+// GetViewMode returns the current view mode
+func (s *State) GetViewMode() ViewMode {
+	return s.viewMode
+}
+
+// ToggleViewMode switches between list and tree view
+func (s *State) ToggleViewMode() ViewMode {
+	if s.viewMode == ViewList {
+		s.SetViewMode(ViewTree)
+	} else {
+		s.SetViewMode(ViewList)
+	}
+	return s.viewMode
+}
+
+// GetTreeNodes returns the tree structure for tree view
+func (s *State) GetTreeNodes() []*TreeNode {
+	return s.treeNodes
+}
+
+// buildDependencyTree constructs a tree structure from issue dependencies
+func (s *State) buildDependencyTree() {
+	s.treeNodes = nil
+
+	// Build maps for parent-child and blocks relationships
+	childrenMap := make(map[string][]*parser.Issue)       // parent ID -> children
+	blockedByMap := make(map[string][]*parser.Issue)      // blocker ID -> blocked issues
+	hasIncomingDep := make(map[string]bool)               // issues that have parents or blockers
+
+	// First pass: build relationship maps
+	for _, issue := range s.issues {
+		// Skip closed issues in tree view
+		if issue.Status == parser.StatusClosed {
+			continue
+		}
+
+		for _, dep := range issue.Dependencies {
+			switch dep.Type {
+			case parser.DepParentChild:
+				// issue is a child of dep.DependsOnID
+				parent := s.issuesByID[dep.DependsOnID]
+				if parent != nil && parent.Status != parser.StatusClosed {
+					childrenMap[dep.DependsOnID] = append(childrenMap[dep.DependsOnID], issue)
+					hasIncomingDep[issue.ID] = true
+				}
+			case parser.DepBlocks:
+				// issue depends on (is blocked by) dep.DependsOnID
+				blocker := s.issuesByID[dep.DependsOnID]
+				if blocker != nil && blocker.Status != parser.StatusClosed {
+					blockedByMap[dep.DependsOnID] = append(blockedByMap[dep.DependsOnID], issue)
+					hasIncomingDep[issue.ID] = true
+				}
+			}
+		}
+	}
+
+	// Second pass: find root nodes (issues with no incoming dependencies)
+	var rootIssues []*parser.Issue
+	for _, issue := range s.issues {
+		if issue.Status != parser.StatusClosed && !hasIncomingDep[issue.ID] {
+			rootIssues = append(rootIssues, issue)
+		}
+	}
+
+	// Build tree recursively from roots
+	visited := make(map[string]bool)
+	for _, root := range rootIssues {
+		node := s.buildTreeNode(root, 0, childrenMap, blockedByMap, visited)
+		if node != nil {
+			s.treeNodes = append(s.treeNodes, node)
+		}
+	}
+}
+
+// buildTreeNode recursively builds a tree node and its children
+func (s *State) buildTreeNode(issue *parser.Issue, depth int, childrenMap map[string][]*parser.Issue, blockedByMap map[string][]*parser.Issue, visited map[string]bool) *TreeNode {
+	// Prevent cycles
+	if visited[issue.ID] {
+		return nil
+	}
+	visited[issue.ID] = true
+
+	node := &TreeNode{
+		Issue:    issue,
+		Children: nil,
+		Depth:    depth,
+	}
+
+	// Add children (from parent-child relationships)
+	if children, ok := childrenMap[issue.ID]; ok {
+		for _, child := range children {
+			if childNode := s.buildTreeNode(child, depth+1, childrenMap, blockedByMap, visited); childNode != nil {
+				node.Children = append(node.Children, childNode)
+			}
+		}
+	}
+
+	// Add blocked issues (from blocks relationships)
+	if blocked, ok := blockedByMap[issue.ID]; ok {
+		for _, blockedIssue := range blocked {
+			if blockedNode := s.buildTreeNode(blockedIssue, depth+1, childrenMap, blockedByMap, visited); blockedNode != nil {
+				node.Children = append(node.Children, blockedNode)
+			}
+		}
+	}
+
+	return node
 }

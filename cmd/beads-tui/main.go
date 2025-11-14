@@ -67,6 +67,57 @@ func main() {
 	var searchMatches []int
 	var currentSearchIndex int
 
+	// Helper function to render tree node recursively
+	var renderTreeNode func(node *state.TreeNode, prefix string, isLast bool, currentIndex *int)
+	renderTreeNode = func(node *state.TreeNode, prefix string, isLast bool, currentIndex *int) {
+		issue := node.Issue
+
+		// Determine branch characters
+		var branch, continuation string
+		if node.Depth == 0 {
+			branch = ""
+			continuation = ""
+		} else {
+			if isLast {
+				branch = "└── "
+				continuation = "    "
+			} else {
+				branch = "├── "
+				continuation = "│   "
+			}
+		}
+
+		// Get status indicator
+		var statusIcon string
+		switch issue.Status {
+		case parser.StatusOpen:
+			statusIcon = "●"
+		case parser.StatusBlocked:
+			statusIcon = "○"
+		case parser.StatusInProgress:
+			statusIcon = "◆"
+		default:
+			statusIcon = "·"
+		}
+
+		// Format issue line
+		priorityColor := getPriorityColor(issue.Priority)
+		statusColor := getStatusColor(issue.Status)
+		text := fmt.Sprintf("%s%s[%s]%s[-] [%s]%s[-] [P%d] %s",
+			prefix, branch, statusColor, statusIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
+
+		issueList.AddItem(text, "", 0, nil)
+		indexToIssue[*currentIndex] = issue
+		*currentIndex++
+
+		// Render children
+		for i, child := range node.Children {
+			isLastChild := i == len(node.Children)-1
+			newPrefix := prefix + continuation
+			renderTreeNode(child, newPrefix, isLastChild, currentIndex)
+		}
+	}
+
 	// Helper function to populate issue list from state
 	populateIssueList := func() {
 		// Clear and rebuild issue list
@@ -74,51 +125,65 @@ func main() {
 		indexToIssue = make(map[int]*parser.Issue)
 		currentIndex := 0
 
-		// Add ready issues
-		readyIssues := appState.GetReadyIssues()
-		if len(readyIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+		// Check view mode
+		if appState.GetViewMode() == state.ViewTree {
+			// Tree view
+			issueList.AddItem("[cyan::b]DEPENDENCY TREE[-::-]", "", 0, nil)
 			currentIndex++
 
-			for _, issue := range readyIssues {
-				priorityColor := getPriorityColor(issue.Priority)
-				text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
-					priorityColor, issue.ID, issue.Priority, issue.Title)
-				issueList.AddItem(text, "", 0, nil)
-				indexToIssue[currentIndex] = issue
-				currentIndex++
+			treeNodes := appState.GetTreeNodes()
+			for i, node := range treeNodes {
+				isLast := i == len(treeNodes)-1
+				renderTreeNode(node, "", isLast, &currentIndex)
 			}
-		}
-
-		// Add blocked issues
-		blockedIssues := appState.GetBlockedIssues()
-		if len(blockedIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
-			currentIndex++
-
-			for _, issue := range blockedIssues {
-				priorityColor := getPriorityColor(issue.Priority)
-				text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
-					priorityColor, issue.ID, issue.Priority, issue.Title)
-				issueList.AddItem(text, "", 0, nil)
-				indexToIssue[currentIndex] = issue
+		} else {
+			// List view (original behavior)
+			// Add ready issues
+			readyIssues := appState.GetReadyIssues()
+			if len(readyIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("[green::b]READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
 				currentIndex++
+
+				for _, issue := range readyIssues {
+					priorityColor := getPriorityColor(issue.Priority)
+					text := fmt.Sprintf("  [%s]●[-] %s [P%d] %s",
+						priorityColor, issue.ID, issue.Priority, issue.Title)
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
 			}
-		}
 
-		// Add in-progress issues
-		inProgressIssues := appState.GetInProgressIssues()
-		if len(inProgressIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
-			currentIndex++
-
-			for _, issue := range inProgressIssues {
-				priorityColor := getPriorityColor(issue.Priority)
-				text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
-					priorityColor, issue.ID, issue.Priority, issue.Title)
-				issueList.AddItem(text, "", 0, nil)
-				indexToIssue[currentIndex] = issue
+			// Add blocked issues
+			blockedIssues := appState.GetBlockedIssues()
+			if len(blockedIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("\n[yellow::b]BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
 				currentIndex++
+
+				for _, issue := range blockedIssues {
+					priorityColor := getPriorityColor(issue.Priority)
+					text := fmt.Sprintf("  [%s]○[-] %s [P%d] %s",
+						priorityColor, issue.ID, issue.Priority, issue.Title)
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
+			}
+
+			// Add in-progress issues
+			inProgressIssues := appState.GetInProgressIssues()
+			if len(inProgressIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("\n[blue::b]IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+				currentIndex++
+
+				for _, issue := range inProgressIssues {
+					priorityColor := getPriorityColor(issue.Priority)
+					text := fmt.Sprintf("  [%s]◆[-] %s [P%d] %s",
+						priorityColor, issue.ID, issue.Priority, issue.Title)
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
 			}
 		}
 	}
@@ -144,8 +209,12 @@ func main() {
 		// Update UI on main thread
 		app.QueueUpdateDraw(func() {
 			// Update status bar
-			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [Press ? for help, q to quit, r to refresh]",
-				beadsDir, len(issues)))
+			viewModeStr := "List"
+			if appState.GetViewMode() == state.ViewTree {
+				viewModeStr = "Tree"
+			}
+			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
+				beadsDir, len(issues), viewModeStr))
 
 			populateIssueList()
 		})
@@ -160,8 +229,12 @@ func main() {
 		os.Exit(1)
 	}
 	appState.LoadIssues(issues)
-	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [Press ? for help, q to quit, r to refresh]",
-		beadsDir, len(issues)))
+	viewModeStr := "List"
+	if appState.GetViewMode() == state.ViewTree {
+		viewModeStr = "Tree"
+	}
+	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
+		beadsDir, len(issues), viewModeStr))
 	populateIssueList()
 
 	// Set up filesystem watcher on the database
@@ -270,8 +343,12 @@ func main() {
 			case tcell.KeyEscape:
 				searchMode = false
 				searchQuery = ""
-				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
-					beadsDir, len(appState.GetAllIssues())))
+				viewModeStr := "List"
+				if appState.GetViewMode() == state.ViewTree {
+					viewModeStr = "Tree"
+				}
+				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
+					beadsDir, len(appState.GetAllIssues()), viewModeStr))
 				return nil
 			case tcell.KeyEnter:
 				performSearch(searchQuery)
@@ -336,6 +413,17 @@ func main() {
 				// Previous search result
 				prevSearchMatch()
 				return nil
+			case 't':
+				// Toggle view mode
+				appState.ToggleViewMode()
+				viewModeStr := "List"
+				if appState.GetViewMode() == state.ViewTree {
+					viewModeStr = "Tree"
+				}
+				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
+					beadsDir, len(appState.GetAllIssues()), viewModeStr))
+				populateIssueList()
+				return nil
 			default:
 				// Reset g flag if any other key is pressed
 				lastKeyWasG = false
@@ -345,8 +433,12 @@ func main() {
 			if len(searchMatches) > 0 {
 				searchMatches = nil
 				currentSearchIndex = -1
-				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
-					beadsDir, len(appState.GetAllIssues())))
+				viewModeStr := "List"
+				if appState.GetViewMode() == state.ViewTree {
+					viewModeStr = "Tree"
+				}
+				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [%s View] [Press ? for help, q to quit, r to refresh, t to toggle view]",
+					beadsDir, len(appState.GetAllIssues()), viewModeStr))
 				return nil
 			}
 		default:
