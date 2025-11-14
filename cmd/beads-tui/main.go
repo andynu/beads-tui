@@ -814,7 +814,7 @@ func main() {
   s           Cycle status (open → in_progress → blocked → closed → open)
   a           Create new issue (vim-style "add")
   c           Add comment to selected issue
-  e           Edit issue fields (description, design, acceptance, notes) in $EDITOR
+  e           Edit issue (title, description, design, acceptance, notes, priority, type)
   x           Close issue with optional reason
   X           Reopen closed issue with optional reason
   D           Manage dependencies (add/remove blocks, parent-child, related)
@@ -896,126 +896,6 @@ func main() {
 
 		pages.AddPage("help", modal, true, true)
 		app.SetFocus(modal)
-	}
-
-	// Helper function to edit a field in $EDITOR
-	editFieldInEditor := func(issue *parser.Issue, fieldName string, currentValue string) {
-		// Get editor from environment or default to vim
-		editor := os.Getenv("EDITOR")
-		if editor == "" {
-			editor = "vim"
-		}
-
-		// Create temp file
-		tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-%s-%s.md", fieldName, issue.ID))
-		template := fmt.Sprintf(`# Edit %s for %s
-# Lines starting with # are ignored
-# Save and exit to update, or exit without saving to cancel
-
-%s`, fieldName, issue.ID, currentValue)
-
-		if err := os.WriteFile(tempFile, []byte(template), 0600); err != nil {
-			log.Printf("EDITOR ERROR: Failed to create temp file: %v", err)
-			statusBar.SetText(fmt.Sprintf("[red]Error creating temp file: %v[-]", err))
-			return
-		}
-		defer os.Remove(tempFile)
-
-		// Suspend TUI
-		app.Suspend(func() {
-			log.Printf("EDITOR: Spawning editor: %s %s", editor, tempFile)
-			// Spawn editor
-			cmd := exec.Command(editor, tempFile)
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-
-			if err := cmd.Run(); err != nil {
-				log.Printf("EDITOR ERROR: Editor exited with error: %v", err)
-				fmt.Fprintf(os.Stderr, "\nEditor exited with error: %v\nPress Enter to continue...", err)
-				fmt.Scanln()
-				return
-			}
-
-			// Read temp file
-			content, err := os.ReadFile(tempFile)
-			if err != nil {
-				log.Printf("EDITOR ERROR: Failed to read temp file: %v", err)
-				fmt.Fprintf(os.Stderr, "\nFailed to read temp file: %v\nPress Enter to continue...", err)
-				fmt.Scanln()
-				return
-			}
-
-			// Strip comment lines and trim
-			var lines []string
-			for _, line := range strings.Split(string(content), "\n") {
-				if !strings.HasPrefix(strings.TrimSpace(line), "#") {
-					lines = append(lines, line)
-				}
-			}
-			strippedContent := strings.TrimSpace(strings.Join(lines, "\n"))
-
-			// If content is empty, ask for confirmation
-			if strippedContent == "" && currentValue != "" {
-				fmt.Print("\nContent is empty. Clear this field? (y/n): ")
-				var response string
-				fmt.Scanln(&response)
-				if response != "y" && response != "Y" {
-					log.Printf("EDITOR: User cancelled clearing field")
-					return
-				}
-			}
-
-			// Update via bd command
-			var bdFieldFlag string
-			switch strings.ToLower(fieldName) {
-			case "description":
-				bdFieldFlag = "--description"
-			case "design":
-				bdFieldFlag = "--design"
-			case "acceptance":
-				bdFieldFlag = "--acceptance"
-			case "notes":
-				bdFieldFlag = "--notes"
-			default:
-				log.Printf("EDITOR ERROR: Unknown field name: %s", fieldName)
-				fmt.Fprintf(os.Stderr, "\nUnknown field: %s\nPress Enter to continue...", fieldName)
-				fmt.Scanln()
-				return
-			}
-
-			// Write content to temp file for bd command (avoid shell escaping issues)
-			contentFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-content-%s.txt", issue.ID))
-			if err := os.WriteFile(contentFile, []byte(strippedContent), 0600); err != nil {
-				log.Printf("EDITOR ERROR: Failed to write content file: %v", err)
-				fmt.Fprintf(os.Stderr, "\nFailed to write content file: %v\nPress Enter to continue...", err)
-				fmt.Scanln()
-				return
-			}
-			defer os.Remove(contentFile)
-
-			bdCmd := fmt.Sprintf("bd update %s %s \"$(cat %s)\"", issue.ID, bdFieldFlag, contentFile)
-			log.Printf("BD COMMAND: Updating %s: %s", fieldName, bdCmd)
-			output, err := exec.Command("sh", "-c", bdCmd).CombinedOutput()
-			if err != nil {
-				log.Printf("BD COMMAND ERROR: Update failed: %v, output: %s", err, string(output))
-				fmt.Fprintf(os.Stderr, "\nError updating %s: %v\nOutput: %s\nPress Enter to continue...", fieldName, err, string(output))
-				fmt.Scanln()
-			} else {
-				log.Printf("BD COMMAND: Update successful for %s", fieldName)
-				fmt.Fprintf(os.Stderr, "\n✓ Updated %s for %s\n", fieldName, issue.ID)
-				time.Sleep(500 * time.Millisecond)
-			}
-		})
-
-		// Resume TUI and refresh
-		if err := app.Draw(); err != nil {
-			log.Printf("APP ERROR: Failed to redraw after editor: %v", err)
-		}
-		statusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [yellow]%s[-] [limegreen]for[-] [white]%s[-]", fieldName, issue.ID))
-		time.AfterFunc(500*time.Millisecond, func() {
-			refreshIssues(issue.ID)
-		})
 	}
 
 	// Helper function to manage dependencies
@@ -1447,8 +1327,8 @@ func main() {
 		app.SetFocus(form)
 	}
 
-	// Helper function to show edit menu
-	showEditMenu := func() {
+	// Helper function to show edit form (in-TUI editing, similar to create issue form)
+	showEditForm := func() {
 		// Get current issue
 		currentIndex := issueList.GetCurrentItem()
 		issue, ok := indexToIssue[currentIndex]
@@ -1458,48 +1338,141 @@ func main() {
 		}
 
 		form := tview.NewForm()
-		form.AddTextView("Editing", issue.ID+" - "+issue.Title, 0, 2, false, false)
-		form.AddButton("Edit Description", func() {
-			pages.RemovePage("edit_menu")
-			app.SetFocus(issueList)
-			editFieldInEditor(issue, "description", issue.Description)
+		var title, description, design, acceptance, notes string
+		var priority int
+		var issueType string
+
+		// Initialize with current values
+		title = issue.Title
+		description = issue.Description
+		design = issue.Design
+		acceptance = issue.AcceptanceCriteria
+		notes = issue.Notes
+		priority = issue.Priority
+		issueType = string(issue.IssueType)
+
+		form.AddTextView("Editing", issue.ID, 0, 1, false, false)
+		form.AddInputField("Title", title, 60, nil, func(text string) {
+			title = text
 		})
-		form.AddButton("Edit Design", func() {
-			pages.RemovePage("edit_menu")
-			app.SetFocus(issueList)
-			editFieldInEditor(issue, "design", issue.Design)
+		form.AddTextArea("Description", description, 60, 5, 0, func(text string) {
+			description = text
 		})
-		form.AddButton("Edit Acceptance Criteria", func() {
-			pages.RemovePage("edit_menu")
-			app.SetFocus(issueList)
-			editFieldInEditor(issue, "acceptance", issue.AcceptanceCriteria)
+		form.AddTextArea("Design", design, 60, 5, 0, func(text string) {
+			design = text
 		})
-		form.AddButton("Edit Notes", func() {
-			pages.RemovePage("edit_menu")
-			app.SetFocus(issueList)
-			editFieldInEditor(issue, "notes", issue.Notes)
+		form.AddTextArea("Acceptance Criteria", acceptance, 60, 5, 0, func(text string) {
+			acceptance = text
 		})
+		form.AddTextArea("Notes", notes, 60, 5, 0, func(text string) {
+			notes = text
+		})
+		form.AddDropDown("Priority", []string{"P0 (Critical)", "P1 (High)", "P2 (Normal)", "P3 (Low)", "P4 (Lowest)"}, priority, func(option string, index int) {
+			priority = index
+		})
+
+		// Find index of current type
+		typeOptions := []string{"bug", "feature", "task", "epic", "chore"}
+		typeIndex := 1 // default to feature
+		for i, t := range typeOptions {
+			if t == issueType {
+				typeIndex = i
+				break
+			}
+		}
+		form.AddDropDown("Type", typeOptions, typeIndex, func(option string, index int) {
+			issueType = option
+		})
+
+		// Save function
+		saveChanges := func() {
+			issueID := issue.ID // Capture before potential refresh
+
+			// Build update command with all fields
+			// Use temp files to avoid shell escaping issues
+			titleFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-title-%s.txt", issueID))
+			descFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-desc-%s.txt", issueID))
+			designFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-design-%s.txt", issueID))
+			acceptFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-accept-%s.txt", issueID))
+			notesFile := filepath.Join(os.TempDir(), fmt.Sprintf("beads-tui-notes-%s.txt", issueID))
+
+			defer os.Remove(titleFile)
+			defer os.Remove(descFile)
+			defer os.Remove(designFile)
+			defer os.Remove(acceptFile)
+			defer os.Remove(notesFile)
+
+			if err := os.WriteFile(titleFile, []byte(title), 0600); err != nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+				return
+			}
+			if err := os.WriteFile(descFile, []byte(description), 0600); err != nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+				return
+			}
+			if err := os.WriteFile(designFile, []byte(design), 0600); err != nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+				return
+			}
+			if err := os.WriteFile(acceptFile, []byte(acceptance), 0600); err != nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+				return
+			}
+			if err := os.WriteFile(notesFile, []byte(notes), 0600); err != nil {
+				statusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+				return
+			}
+
+			cmd := fmt.Sprintf("bd update %s --title \"$(cat %s)\" --description \"$(cat %s)\" --design \"$(cat %s)\" --acceptance \"$(cat %s)\" --notes \"$(cat %s)\" --priority %d --type %s",
+				issueID, titleFile, descFile, designFile, acceptFile, notesFile, priority, issueType)
+
+			log.Printf("BD COMMAND: Updating issue: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Update failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error updating issue: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Issue updated successfully")
+				statusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [white]%s[-]", issueID))
+				pages.RemovePage("edit_form")
+				app.SetFocus(issueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		}
+
+		form.AddButton("Save (Ctrl-S)", saveChanges)
 		form.AddButton("Cancel", func() {
-			pages.RemovePage("edit_menu")
+			pages.RemovePage("edit_form")
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Edit Issue Fields ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Edit Issue (Ctrl-S to save) ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
-			pages.RemovePage("edit_menu")
+			pages.RemovePage("edit_form")
 			app.SetFocus(issueList)
 		})
 
-		// Create modal (centered)
+		// Add Ctrl-S handler for save
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlS {
+				saveChanges()
+				return nil
+			}
+			return event
+		})
+
+		// Create modal (centered, larger for editing)
 		modal := tview.NewFlex().
 			AddItem(nil, 0, 1, false).
 			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 				AddItem(nil, 0, 1, false).
-				AddItem(form, 0, 2, true).
-				AddItem(nil, 0, 1, false), 0, 2, true).
+				AddItem(form, 0, 4, true).
+				AddItem(nil, 0, 1, false), 0, 3, true).
 			AddItem(nil, 0, 1, false)
 
-		pages.AddPage("edit_menu", modal, true, true)
+		pages.AddPage("edit_form", modal, true, true)
 		app.SetFocus(form)
 	}
 
@@ -1958,8 +1931,8 @@ func main() {
 				showCommentDialog()
 				return nil
 			case 'e':
-				// Open edit menu for current issue
-				showEditMenu()
+				// Open edit form for current issue
+				showEditForm()
 				return nil
 			case 'D':
 				// Open dependency management dialog
