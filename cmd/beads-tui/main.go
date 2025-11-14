@@ -591,9 +591,10 @@ func main() {
 				pages.RemovePage("comment_dialog")
 				app.SetFocus(issueList)
 
-				// Refresh issues after a short delay
+				// Refresh issues after a short delay, preserving selection
+				issueID := issue.ID
 				time.AfterFunc(500*time.Millisecond, func() {
-					refreshIssues()
+					refreshIssues(issueID)
 				})
 			}
 		})
@@ -628,8 +629,9 @@ func main() {
 					statusBar.SetText("[green]✓ Comment added successfully[-]")
 					pages.RemovePage("comment_dialog")
 					app.SetFocus(issueList)
+					issueID := issue.ID
 					time.AfterFunc(500*time.Millisecond, func() {
-						refreshIssues()
+						refreshIssues(issueID)
 					})
 				}
 				return nil
@@ -1446,8 +1448,9 @@ func main() {
 				app.Stop()
 				return nil
 			case 'r':
-				// Manual refresh
-				refreshIssues()
+				// Manual refresh - run in goroutine to avoid blocking UI
+				statusBar.SetText("[yellow]Refreshing...[-]")
+				go refreshIssues()
 				return nil
 			case 'j':
 				// Down - simulate down arrow
