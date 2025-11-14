@@ -34,10 +34,17 @@ func New(path string, debounceDelay time.Duration, onChange func()) (*Watcher, e
 	return w, nil
 }
 
-// Start begins watching the file
+// Start begins watching the file (and SQLite WAL file if applicable)
 func (w *Watcher) Start() error {
 	if err := w.watcher.Add(w.path); err != nil {
 		return fmt.Errorf("failed to watch file: %w", err)
+	}
+
+	// For SQLite databases, also watch the WAL file where changes are written
+	walPath := w.path + "-wal"
+	if err := w.watcher.Add(walPath); err != nil {
+		// WAL file might not exist yet, which is fine
+		// We'll still catch changes to the main DB file
 	}
 
 	go w.watchLoop()

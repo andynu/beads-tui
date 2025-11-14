@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
+	"github.com/andy/beads-tui/internal/storage"
 	"github.com/andy/beads-tui/internal/watcher"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -21,14 +23,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	jsonlPath := filepath.Join(beadsDir, "issues.jsonl")
+	dbPath := filepath.Join(beadsDir, "beads.db")
 
-	// Check if JSONL file exists
-	if _, err := os.Stat(jsonlPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error: %s not found\n", jsonlPath)
+	// Check if database file exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: %s not found\n", dbPath)
 		fmt.Fprintf(os.Stderr, "Have you initialized beads? Run: bd init\n")
 		os.Exit(1)
 	}
+
+	// Open SQLite database in read-only mode
+	sqliteReader, err := storage.NewSQLiteReader(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
+		os.Exit(1)
+	}
+	defer sqliteReader.Close()
 
 	// Initialize state
 	appState := state.New()
@@ -42,11 +52,20 @@ func main() {
 
 	// Issue list
 	issueList := tview.NewList().
-		ShowSecondaryText(false)
+		ShowSecondaryText(false).
+		SetSelectedBackgroundColor(tcell.ColorNavy).
+		SetSelectedTextColor(tcell.ColorWhite)
 	issueList.SetBorder(true).SetTitle("Issues")
 
 	// Track mapping from list index to issue
 	indexToIssue := make(map[int]*parser.Issue)
+
+	// Vim navigation state
+	var lastKeyWasG bool
+	var searchMode bool
+	var searchQuery string
+	var searchMatches []int
+	var currentSearchIndex int
 
 	// Helper function to populate issue list from state
 	populateIssueList := func() {
@@ -106,12 +125,15 @@ func main() {
 
 	// Function to load and display issues (for async updates after app starts)
 	refreshIssues := func() {
-		// Parse issues
-		issues, err := parser.ParseFile(jsonlPath)
+		// Load issues from SQLite with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		issues, err := sqliteReader.LoadIssues(ctx)
 		if err != nil {
 			// Show error in status bar
 			app.QueueUpdateDraw(func() {
-				statusBar.SetText(fmt.Sprintf("[red]Error parsing issues: %v[-]", err))
+				statusBar.SetText(fmt.Sprintf("[red]Error loading issues: %v[-]", err))
 			})
 			return
 		}
@@ -122,7 +144,7 @@ func main() {
 		// Update UI on main thread
 		app.QueueUpdateDraw(func() {
 			// Update status bar
-			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
+			statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [Press ? for help, q to quit, r to refresh]",
 				beadsDir, len(issues)))
 
 			populateIssueList()
@@ -130,24 +152,26 @@ func main() {
 	}
 
 	// Initial load (before app starts, no QueueUpdateDraw)
-	issues, err := parser.ParseFile(jsonlPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	issues, err := sqliteReader.LoadIssues(ctx)
+	cancel()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing issues: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading issues: %v\n", err)
 		os.Exit(1)
 	}
 	appState.LoadIssues(issues)
-	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
+	statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [SQLite] [Press ? for help, q to quit, r to refresh]",
 		beadsDir, len(issues)))
 	populateIssueList()
 
-	// Set up filesystem watcher
-	fileWatcher, err := watcher.New(jsonlPath, 200*time.Millisecond, refreshIssues)
+	// Set up filesystem watcher on the database
+	fileWatcher, err := watcher.New(dbPath, 200*time.Millisecond, refreshIssues)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to set up file watcher: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: failed to set up database watcher: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Live updates will not work. Press 'r' to manually refresh.\n")
 	} else {
 		if err := fileWatcher.Start(); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to start file watcher: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to start database watcher: %v\n", err)
 		}
 		defer fileWatcher.Stop()
 	}
@@ -184,8 +208,90 @@ func main() {
 			AddItem(detailPanel, 0, 2, false),
 			0, 1, true)
 
+	// Helper function to perform search
+	performSearch := func(query string) {
+		searchMatches = nil
+		currentSearchIndex = -1
+
+		if query == "" {
+			return
+		}
+
+		// Search through all items in the list
+		for i := 0; i < issueList.GetItemCount(); i++ {
+			mainText, _ := issueList.GetItemText(i)
+			// Simple case-insensitive substring search
+			if len(mainText) > 0 && containsCaseInsensitive(mainText, query) {
+				searchMatches = append(searchMatches, i)
+			}
+		}
+
+		// Jump to first match if any
+		if len(searchMatches) > 0 {
+			currentSearchIndex = 0
+			issueList.SetCurrentItem(searchMatches[0])
+			statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+				query, 1, len(searchMatches)))
+		} else {
+			statusBar.SetText(fmt.Sprintf("[red]Search:[-] %s [No matches]", query))
+		}
+	}
+
+	// Helper function for next search result
+	nextSearchMatch := func() {
+		if len(searchMatches) == 0 {
+			return
+		}
+		currentSearchIndex = (currentSearchIndex + 1) % len(searchMatches)
+		issueList.SetCurrentItem(searchMatches[currentSearchIndex])
+		statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+			searchQuery, currentSearchIndex+1, len(searchMatches)))
+	}
+
+	// Helper function for previous search result
+	prevSearchMatch := func() {
+		if len(searchMatches) == 0 {
+			return
+		}
+		currentSearchIndex--
+		if currentSearchIndex < 0 {
+			currentSearchIndex = len(searchMatches) - 1
+		}
+		issueList.SetCurrentItem(searchMatches[currentSearchIndex])
+		statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+			searchQuery, currentSearchIndex+1, len(searchMatches)))
+	}
+
 	// Set up key bindings
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Handle search mode
+		if searchMode {
+			switch event.Key() {
+			case tcell.KeyEscape:
+				searchMode = false
+				searchQuery = ""
+				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
+					beadsDir, len(appState.GetAllIssues())))
+				return nil
+			case tcell.KeyEnter:
+				performSearch(searchQuery)
+				searchMode = false
+				return nil
+			case tcell.KeyBackspace, tcell.KeyBackspace2:
+				if len(searchQuery) > 0 {
+					searchQuery = searchQuery[:len(searchQuery)-1]
+					statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s_", searchQuery))
+				}
+				return nil
+			case tcell.KeyRune:
+				searchQuery += string(event.Rune())
+				statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s_", searchQuery))
+				return nil
+			}
+			return nil
+		}
+
+		// Normal mode key bindings
 		switch event.Key() {
 		case tcell.KeyRune:
 			switch event.Rune() {
@@ -202,7 +308,49 @@ func main() {
 			case 'k':
 				// Up - simulate up arrow
 				return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+			case 'g':
+				if lastKeyWasG {
+					// gg - jump to top
+					issueList.SetCurrentItem(0)
+					lastKeyWasG = false
+					return nil
+				}
+				lastKeyWasG = true
+				return nil
+			case 'G':
+				// G - jump to bottom
+				issueList.SetCurrentItem(issueList.GetItemCount() - 1)
+				lastKeyWasG = false
+				return nil
+			case '/':
+				// Start search mode
+				searchMode = true
+				searchQuery = ""
+				statusBar.SetText("[yellow]Search:[-] _")
+				return nil
+			case 'n':
+				// Next search result
+				nextSearchMatch()
+				return nil
+			case 'N':
+				// Previous search result
+				prevSearchMatch()
+				return nil
+			default:
+				// Reset g flag if any other key is pressed
+				lastKeyWasG = false
 			}
+		case tcell.KeyEscape:
+			// Clear search on ESC
+			if len(searchMatches) > 0 {
+				searchMatches = nil
+				currentSearchIndex = -1
+				statusBar.SetText(fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues) [Press ? for help, q to quit, r to refresh]",
+					beadsDir, len(appState.GetAllIssues())))
+				return nil
+			}
+		default:
+			lastKeyWasG = false
 		}
 		return event
 	})
@@ -398,4 +546,34 @@ func getDependencyColor(depType parser.DependencyType) string {
 	default:
 		return "white"
 	}
+}
+
+// containsCaseInsensitive checks if s contains substr (case-insensitive)
+func containsCaseInsensitive(s, substr string) bool {
+	s = toLower(s)
+	substr = toLower(substr)
+	return len(s) >= len(substr) && indexCaseInsensitive(s, substr) >= 0
+}
+
+// toLower converts string to lowercase
+func toLower(s string) string {
+	result := make([]rune, len(s))
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			result[i] = r + 32
+		} else {
+			result[i] = r
+		}
+	}
+	return string(result)
+}
+
+// indexCaseInsensitive finds the index of substr in s (case-insensitive)
+func indexCaseInsensitive(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
