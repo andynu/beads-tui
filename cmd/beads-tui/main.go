@@ -141,7 +141,7 @@ func main() {
 			filterText = fmt.Sprintf(" [Filters: %s]", appState.GetActiveFilters())
 		}
 
-		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for filters]",
+		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
 			beadsDir, visibleCount, filterText, viewModeStr, mouseStr, focusStr)
 	}
 
@@ -652,65 +652,122 @@ func main() {
 		app.SetFocus(form)
 	}
 
-	// Helper function to show filter menu
-	showFilterMenu := func() {
+	// Helper function to show quick filter (keyboard-friendly)
+	showQuickFilter := func() {
 		form := tview.NewForm()
+		var filterQuery string
 
-		// Priority checkboxes
-		form.AddTextView("Priority Filter", "Toggle priorities to show:", 0, 1, false, false)
-		for p := 0; p <= 4; p++ {
-			priority := p // Capture for closure
-			checked := appState.IsPriorityFiltered(priority)
-			form.AddCheckbox(fmt.Sprintf("P%d", priority), checked, func(isChecked bool) {
-				appState.TogglePriorityFilter(priority)
+		helpText := `[yellow]Quick Filter Syntax:[-]
+  p0-p4    Priority (e.g., 'p1' or 'p1,p2')
+  bug, feature, task, epic, chore    Types
+  open, in_progress, blocked, closed    Statuses
+
+[cyan]Examples:[-]
+  p1 bug          P1 bugs only
+  feature,task    Features and tasks
+  p0,p1 open      High priority open issues
+
+[gray]Leave empty to clear all filters[-]`
+
+		form.AddTextView("", helpText, 0, 11, false, false)
+		form.AddInputField("Filter", "", 50, nil, func(text string) {
+			filterQuery = text
+		})
+
+		// Apply filter function
+		applyQuickFilter := func() {
+			// Clear existing filters
+			appState.ClearAllFilters()
+
+			if filterQuery == "" {
+				// Empty query = clear all filters
+				pages.RemovePage("quick_filter")
+				app.SetFocus(issueList)
+				statusBar.SetText(getStatusBarText())
+				populateIssueList()
+				return
+			}
+
+			// Parse filter query (space or comma separated)
+			query := strings.ToLower(strings.TrimSpace(filterQuery))
+			tokens := strings.FieldsFunc(query, func(r rune) bool {
+				return r == ' ' || r == ','
 			})
-		}
 
-		// Type checkboxes
-		form.AddTextView("Type Filter", "Toggle types to show:", 0, 1, false, false)
-		types := []parser.IssueType{parser.TypeBug, parser.TypeFeature, parser.TypeTask, parser.TypeEpic, parser.TypeChore}
-		for _, t := range types {
-			issueType := t // Capture for closure
-			checked := appState.IsTypeFiltered(issueType)
-			form.AddCheckbox(string(issueType), checked, func(isChecked bool) {
-				appState.ToggleTypeFilter(issueType)
-			})
-		}
+			// Process each token
+			for _, token := range tokens {
+				token = strings.TrimSpace(token)
+				if token == "" {
+					continue
+				}
 
-		// Status checkboxes
-		form.AddTextView("Status Filter", "Toggle statuses to show:", 0, 1, false, false)
-		statuses := []parser.Status{parser.StatusOpen, parser.StatusInProgress, parser.StatusBlocked, parser.StatusClosed}
-		for _, s := range statuses {
-			status := s // Capture for closure
-			checked := appState.IsStatusFiltered(status)
-			form.AddCheckbox(string(status), checked, func(isChecked bool) {
-				appState.ToggleStatusFilter(status)
-			})
-		}
+				// Check for priority (p0-p4)
+				if len(token) == 2 && token[0] == 'p' && token[1] >= '0' && token[1] <= '4' {
+					priority := int(token[1] - '0')
+					appState.TogglePriorityFilter(priority)
+					continue
+				}
 
-		// Buttons
-		form.AddButton("Apply", func() {
-			pages.RemovePage("filter_menu")
+				// Check for type
+				switch token {
+				case "bug":
+					appState.ToggleTypeFilter(parser.TypeBug)
+				case "feature":
+					appState.ToggleTypeFilter(parser.TypeFeature)
+				case "task":
+					appState.ToggleTypeFilter(parser.TypeTask)
+				case "epic":
+					appState.ToggleTypeFilter(parser.TypeEpic)
+				case "chore":
+					appState.ToggleTypeFilter(parser.TypeChore)
+				}
+
+				// Check for status
+				switch token {
+				case "open":
+					appState.ToggleStatusFilter(parser.StatusOpen)
+				case "in_progress", "inprogress":
+					appState.ToggleStatusFilter(parser.StatusInProgress)
+				case "blocked":
+					appState.ToggleStatusFilter(parser.StatusBlocked)
+				case "closed":
+					appState.ToggleStatusFilter(parser.StatusClosed)
+				}
+			}
+
+			// Apply filters
+			pages.RemovePage("quick_filter")
 			app.SetFocus(issueList)
 			statusBar.SetText(getStatusBarText())
 			populateIssueList()
-		})
+		}
+
+		form.AddButton("Apply (Enter)", applyQuickFilter)
 		form.AddButton("Clear All", func() {
 			appState.ClearAllFilters()
-			pages.RemovePage("filter_menu")
+			pages.RemovePage("quick_filter")
 			app.SetFocus(issueList)
 			statusBar.SetText(getStatusBarText())
 			populateIssueList()
 		})
-		form.AddButton("Cancel", func() {
-			pages.RemovePage("filter_menu")
+		form.AddButton("Cancel (ESC)", func() {
+			pages.RemovePage("quick_filter")
 			app.SetFocus(issueList)
 		})
 
-		form.SetBorder(true).SetTitle(" Filter Issues ").SetTitleAlign(tview.AlignCenter)
+		form.SetBorder(true).SetTitle(" Quick Filter ").SetTitleAlign(tview.AlignCenter)
 		form.SetCancelFunc(func() {
-			pages.RemovePage("filter_menu")
+			pages.RemovePage("quick_filter")
 			app.SetFocus(issueList)
+		})
+
+		// Add Enter key handler to apply filter
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEnter {
+				applyQuickFilter()
+				return nil
+			}
+			return event
 		})
 
 		// Create modal (centered)
@@ -718,11 +775,11 @@ func main() {
 			AddItem(nil, 0, 1, false).
 			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 				AddItem(nil, 0, 1, false).
-				AddItem(form, 0, 3, true).
+				AddItem(form, 0, 2, true).
 				AddItem(nil, 0, 1, false), 0, 2, true).
 			AddItem(nil, 0, 1, false)
 
-		pages.AddPage("filter_menu", modal, true, true)
+		pages.AddPage("quick_filter", modal, true, true)
 		app.SetFocus(form)
 	}
 
@@ -758,7 +815,7 @@ func main() {
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
-  f           Open filter menu (priority, type, status)
+  f           Quick filter (type: p1 bug, feature, etc.)
   m           Toggle mouse mode on/off
   r           Manual refresh
 
@@ -1562,8 +1619,8 @@ func main() {
 				showHelpScreen()
 				return nil
 			case 'f':
-				// Show filter menu
-				showFilterMenu()
+				// Show quick filter
+				showQuickFilter()
 				return nil
 			case '0', '1', '2', '3', '4':
 				// Quick priority change
