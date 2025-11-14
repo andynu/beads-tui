@@ -85,6 +85,26 @@ beads-tui/
 - [tcell](https://github.com/gdamore/tcell) - Low-level terminal control
 - [fsnotify](https://github.com/fsnotify/fsnotify) - Filesystem monitoring
 
+## Troubleshooting
+
+### No issues displayed
+
+If the TUI shows no issues but `bd ready` shows issues, the JSONL file hasn't been exported yet. The beads daemon uses a 30-second debounce before auto-exporting.
+
+**Quick fix:**
+```bash
+bd export -o .beads/issues.jsonl
+```
+
+Or wait ~30 seconds after creating/modifying issues for auto-export.
+
+### File not found error
+
+Ensure you're in a directory with a `.beads` folder:
+```bash
+bd init --quiet  # Initialize beads if needed
+```
+
 ## Development
 
 This project uses [beads](https://github.com/steveyegge/beads) for issue tracking. View the current work:
