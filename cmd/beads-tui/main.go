@@ -195,8 +195,9 @@ func main() {
 			layoutStr = "Vertical"
 		}
 
-		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [%s] [Mouse: %s] [Focus: %s] [Press ? for help, v to toggle layout]",
-			beadsDir, visibleCount, filterText, closedText, viewModeStr, layoutStr, mouseStr, focusStr)
+		emphasisColor := formatting.GetEmphasisColor()
+		return fmt.Sprintf("[%s]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [%s] [Mouse: %s] [Focus: %s] [Press ? for help, v to toggle layout]",
+			emphasisColor, beadsDir, visibleCount, filterText, closedText, viewModeStr, layoutStr, mouseStr, focusStr)
 	}
 
 	// Helper function to populate issue list from state
@@ -308,7 +309,7 @@ func main() {
 		SetScrollable(true).
 		SetWrap(true)
 	detailPanel.SetBorder(true).SetTitle("Details")
-	detailPanel.SetText("[yellow]Navigate to an issue to view details[-]")
+	detailPanel.SetText(fmt.Sprintf("[%s]Navigate to an issue to view details[-]", formatting.GetEmphasisColor()))
 
 	// Add mouse click handler for copying issue ID
 	detailPanel.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
@@ -328,10 +329,10 @@ func main() {
 				err := clipboard.WriteAll(currentDetailIssue.ID)
 				if err != nil {
 					log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
-					statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+					statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 				} else {
 					log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", currentDetailIssue.ID)
-					statusBar.SetText(fmt.Sprintf("[limegreen]✓ Copied[-] [white]%s[-] [limegreen]to clipboard[-]", currentDetailIssue.ID))
+					statusBar.SetText(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID))
 					// Clear message after 2 seconds
 					time.AfterFunc(2*time.Second, func() {
 						app.QueueUpdateDraw(func() {
@@ -466,13 +467,15 @@ func main() {
 		}
 
 		// Jump to first match if any
+		emphasisColor := formatting.GetEmphasisColor()
+		errorColor := formatting.GetErrorColor()
 		if len(searchMatches) > 0 {
 			currentSearchIndex = 0
 			issueList.SetCurrentItem(searchMatches[0])
-			statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
-				query, 1, len(searchMatches)))
+			statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+				emphasisColor, query, 1, len(searchMatches)))
 		} else {
-			statusBar.SetText(fmt.Sprintf("[red]Search:[-] %s [No matches]", query))
+			statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s [No matches]", errorColor, query))
 		}
 	}
 
@@ -483,8 +486,8 @@ func main() {
 		}
 		currentSearchIndex = (currentSearchIndex + 1) % len(searchMatches)
 		issueList.SetCurrentItem(searchMatches[currentSearchIndex])
-		statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
-			searchQuery, currentSearchIndex+1, len(searchMatches)))
+		statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+			formatting.GetEmphasisColor(), searchQuery, currentSearchIndex+1, len(searchMatches)))
 	}
 
 	// Helper function for previous search result
@@ -497,8 +500,8 @@ func main() {
 			currentSearchIndex = len(searchMatches) - 1
 		}
 		issueList.SetCurrentItem(searchMatches[currentSearchIndex])
-		statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
-			searchQuery, currentSearchIndex+1, len(searchMatches)))
+		statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s [%d/%d matches] [Press n/N for next/prev, ESC to exit search]",
+			formatting.GetEmphasisColor(), searchQuery, currentSearchIndex+1, len(searchMatches)))
 	}
 
 	// Helper function to show comment dialog
@@ -597,12 +600,12 @@ func main() {
 			case tcell.KeyBackspace, tcell.KeyBackspace2:
 				if len(searchQuery) > 0 {
 					searchQuery = searchQuery[:len(searchQuery)-1]
-					statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s_", searchQuery))
+					statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s_", formatting.GetEmphasisColor(), searchQuery))
 				}
 				return nil
 			case tcell.KeyRune:
 				searchQuery += string(event.Rune())
-				statusBar.SetText(fmt.Sprintf("[yellow]Search:[-] %s_", searchQuery))
+				statusBar.SetText(fmt.Sprintf("[%s]Search:[-] %s_", formatting.GetEmphasisColor(), searchQuery))
 				return nil
 			}
 			return nil
@@ -763,7 +766,7 @@ func main() {
 				return nil
 			case 'r':
 				// Manual refresh - run in goroutine to avoid blocking UI
-				statusBar.SetText("[yellow]Refreshing...[-]")
+				statusBar.SetText(fmt.Sprintf("[%s]Refreshing...[-]", formatting.GetEmphasisColor()))
 				go refreshIssues()
 				return nil
 			case 'j':
@@ -790,7 +793,7 @@ func main() {
 				// Start search mode
 				searchMode = true
 				searchQuery = ""
-				statusBar.SetText("[yellow]Search:[-] _")
+				statusBar.SetText(fmt.Sprintf("[%s]Search:[-] _", formatting.GetEmphasisColor()))
 				return nil
 			case 'n':
 				// Next search result
@@ -849,7 +852,7 @@ func main() {
 					err := clipboard.WriteAll(issue.ID)
 					if err != nil {
 						log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
-						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", issue.ID)
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)))
@@ -869,7 +872,7 @@ func main() {
 					err := clipboard.WriteAll(text)
 					if err != nil {
 						log.Printf("CLIPBOARD ERROR: Failed to copy to clipboard: %v", err)
-						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID with title to clipboard: %s", text)
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)))
@@ -889,7 +892,7 @@ func main() {
 					err := clipboard.WriteAll(branchName)
 					if err != nil {
 						log.Printf("CLIPBOARD ERROR: Failed to copy branch name: %v", err)
-						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
+						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied branch name to clipboard: %s", branchName)
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)))
@@ -952,7 +955,7 @@ func main() {
 			case 's':
 				// Initiate status shortcut sequence
 				lastKeyWasS = true
-				statusBar.SetText("[yellow]Status shortcut: o/i/b/c[-]")
+				statusBar.SetText(fmt.Sprintf("[%s]Status shortcut: o/i/b/c[-]", formatting.GetEmphasisColor()))
 				// Reset after 2 seconds if no second key
 				time.AfterFunc(2*time.Second, func() {
 					app.QueueUpdateDraw(func() {
