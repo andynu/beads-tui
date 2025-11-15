@@ -107,3 +107,7 @@ func (t *TokyoNightTheme) AppBackground() tcell.Color {
 func (t *TokyoNightTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0xa9b1d6) // foreground
 }
+
+func (t *TokyoNightTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x24283b) // background highlight
+}

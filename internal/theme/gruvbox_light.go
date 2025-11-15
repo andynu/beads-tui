@@ -107,3 +107,7 @@ func (t *GruvboxLightTheme) AppBackground() tcell.Color {
 func (t *GruvboxLightTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0x3c3836) // fg
 }
+
+func (t *GruvboxLightTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0xf2e5bc) // bg1 (slightly darker than bg0)
+}

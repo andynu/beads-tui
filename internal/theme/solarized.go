@@ -108,6 +108,10 @@ func (t *SolarizedDarkTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0x839496) // base0
 }
 
+func (t *SolarizedDarkTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x073642) // base02 (lighter than base03)
+}
+
 // SolarizedLightTheme provides the Solarized Light color scheme
 type SolarizedLightTheme struct{}
 
@@ -211,4 +215,8 @@ func (t *SolarizedLightTheme) AppBackground() tcell.Color {
 
 func (t *SolarizedLightTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0x657b83) // base00
+}
+
+func (t *SolarizedLightTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0xeee8d5) // base2 (darker than base3)
 }

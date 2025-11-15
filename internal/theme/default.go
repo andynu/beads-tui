@@ -106,3 +106,7 @@ func (t *DefaultTheme) AppBackground() tcell.Color {
 func (t *DefaultTheme) AppForeground() tcell.Color {
 	return tcell.ColorWhite
 }
+
+func (t *DefaultTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x1a1a1a) // Slightly lighter than black background
+}

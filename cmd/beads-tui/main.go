@@ -120,7 +120,8 @@ func main() {
 	currentTheme := theme.Current()
 	tview.Styles.PrimitiveBackgroundColor = currentTheme.AppBackground()
 	tview.Styles.PrimaryTextColor = currentTheme.AppForeground()
-	tview.Styles.ContrastBackgroundColor = currentTheme.AppBackground()
+	tview.Styles.ContrastBackgroundColor = currentTheme.InputFieldBackground()
+	tview.Styles.MoreContrastBackgroundColor = currentTheme.InputFieldBackground()
 
 	// Status bar
 	statusBar := tview.NewTextView().

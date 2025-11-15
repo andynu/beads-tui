@@ -107,3 +107,7 @@ func (t *DraculaTheme) AppBackground() tcell.Color {
 func (t *DraculaTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0xf8f8f2) // foreground
 }
+
+func (t *DraculaTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x44475a) // current line (lighter than background)
+}

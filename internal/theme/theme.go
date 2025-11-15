@@ -45,6 +45,9 @@ type Theme interface {
 	// Application-wide colors
 	AppBackground() tcell.Color
 	AppForeground() tcell.Color
+
+	// Input field colors
+	InputFieldBackground() tcell.Color
 }
 
 var (

@@ -108,6 +108,10 @@ func (t *CatppuccinMochaTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0xcdd6f4) // text
 }
 
+func (t *CatppuccinMochaTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x313244) // surface0
+}
+
 // CatppuccinLatteTheme provides the Catppuccin Latte (light) color scheme
 // Based on: https://github.com/catppuccin/catppuccin
 type CatppuccinLatteTheme struct{}
@@ -212,4 +216,8 @@ func (t *CatppuccinLatteTheme) AppBackground() tcell.Color {
 
 func (t *CatppuccinLatteTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0x4c4f69) // text
+}
+
+func (t *CatppuccinLatteTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0xe6e9ef) // surface0
 }

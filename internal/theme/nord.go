@@ -107,3 +107,7 @@ func (t *NordTheme) AppBackground() tcell.Color {
 func (t *NordTheme) AppForeground() tcell.Color {
 	return tcell.NewHexColor(0xeceff4) // nord6
 }
+
+func (t *NordTheme) InputFieldBackground() tcell.Color {
+	return tcell.NewHexColor(0x3b4252) // nord1 (polar night lighter)
+}
