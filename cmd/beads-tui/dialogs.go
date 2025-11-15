@@ -1383,12 +1383,12 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		}
 	}
 
-	// Add form fields
-	form.AddInputField("Title", "", 50, nil, func(text string) {
+	// Add form fields with labels on separate lines for more horizontal space
+	form.AddInputField("Title\n", "", 0, nil, func(text string) {
 		title = text
 		updateFromText()
 	})
-	form.AddTextArea("Description", "", 60, 5, 0, func(text string) {
+	form.AddTextArea("Description\n", "", 0, 5, 0, func(text string) {
 		description = text
 		updateFromText()
 	})
