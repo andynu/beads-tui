@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -671,13 +670,12 @@ func main() {
 				// Execute status update
 				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
 					issueID := issue.ID
-					cmd := fmt.Sprintf("bd update %s --status %s", issueID, newStatus)
-					log.Printf("BD COMMAND: Executing status update (S%c): %s", event.Rune(), cmd)
-					err := exec.Command("sh", "-c", cmd).Run()
+					log.Printf("BD COMMAND: Executing status update (S%c): bd update %s --status %s", event.Rune(), issueID, newStatus)
+					updatedIssue, err := execBdJSONIssue("update", issueID, "--status", string(newStatus))
 					if err != nil {
 						statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
 					} else {
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", issueID, newStatus))
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", updatedIssue.ID, updatedIssue.Status))
 						time.AfterFunc(500*time.Millisecond, func() {
 							refreshIssues(issueID)
 						})
@@ -853,16 +851,15 @@ func main() {
 				if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
 					priority := int(event.Rune() - '0')
 					issueID := issue.ID // Capture issue ID before refresh
-					// Update priority via bd command
-					cmd := fmt.Sprintf("bd update %s --priority %d", issueID, priority)
-					log.Printf("BD COMMAND: Executing priority update: %s", cmd)
-					err := exec.Command("sh", "-c", cmd).Run()
+					// Update priority via bd command with --json
+					log.Printf("BD COMMAND: Executing priority update: bd update %s --priority %d", issueID, priority)
+					updatedIssue, err := execBdJSONIssue("update", issueID, "--priority", fmt.Sprintf("%d", priority))
 					if err != nil {
 						log.Printf("BD COMMAND ERROR: Priority update failed: %v", err)
 						statusBar.SetText(fmt.Sprintf("[red]Error updating priority: %v[-]", err))
 					} else {
-						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", issueID, priority)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", issueID, priority))
+						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", updatedIssue.ID, updatedIssue.Priority)
+						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", updatedIssue.ID, updatedIssue.Priority))
 						// Refresh issues after a short delay, preserving selection
 						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
 						time.AfterFunc(500*time.Millisecond, func() {

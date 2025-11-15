@@ -150,16 +150,15 @@ func (h *DialogHelpers) ShowRenameDialog() {
 			return
 		}
 
-		// Execute bd update command
-		cmd := fmt.Sprintf("bd update %s --title %q", issue.ID, newTitle)
-		log.Printf("BD COMMAND: Renaming issue: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		// Execute bd update command with --json
+		log.Printf("BD COMMAND: Renaming issue: bd update %s --title %q", issue.ID, newTitle)
+		updatedIssue, err := execBdJSONIssue("update", issue.ID, "--title", newTitle)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Rename failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Rename failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error renaming issue: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Issue renamed successfully: %s", string(output))
-			h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", issue.ID))
+			log.Printf("BD COMMAND: Issue renamed successfully: %s", updatedIssue.Title)
+			h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", updatedIssue.ID))
 
 			// Close dialog
 			h.Pages.RemovePage("rename_dialog")
@@ -192,15 +191,14 @@ func (h *DialogHelpers) ShowRenameDialog() {
 				return nil
 			}
 
-			cmd := fmt.Sprintf("bd update %s --title %q", issue.ID, newTitle)
-			log.Printf("BD COMMAND: Renaming issue: %s", cmd)
-			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			log.Printf("BD COMMAND: Renaming issue: bd update %s --title %q", issue.ID, newTitle)
+			updatedIssue, err := execBdJSONIssue("update", issue.ID, "--title", newTitle)
 			if err != nil {
-				log.Printf("BD COMMAND ERROR: Rename failed: %v, output: %s", err, string(output))
+				log.Printf("BD COMMAND ERROR: Rename failed: %v", err)
 				h.StatusBar.SetText(fmt.Sprintf("[red]Error renaming issue: %v[-]", err))
 			} else {
-				log.Printf("BD COMMAND: Issue renamed successfully: %s", string(output))
-				h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", issue.ID))
+				log.Printf("BD COMMAND: Issue renamed successfully: %s", updatedIssue.Title)
+				h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", updatedIssue.ID))
 				h.Pages.RemovePage("rename_dialog")
 				h.App.SetFocus(h.IssueList)
 				issueID := issue.ID
@@ -875,18 +873,18 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 
 	form.AddButton("Close Issue", func() {
 		issueID := issue.ID // Capture before potential refresh
-		cmd := fmt.Sprintf("bd close %s", issueID)
+		args := []string{"close", issueID}
 		if reason != "" {
-			cmd += fmt.Sprintf(" --reason %q", reason)
+			args = append(args, "--reason", reason)
 		}
-		log.Printf("BD COMMAND: Closing issue: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		log.Printf("BD COMMAND: Closing issue: bd %s", strings.Join(args, " "))
+		closedIssue, err := execBdJSONIssue(args...)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Close failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Close failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Issue closed successfully")
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", issueID))
+			log.Printf("BD COMMAND: Issue closed successfully: %s", closedIssue.ID)
+			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", closedIssue.ID))
 			h.Pages.RemovePage("close_issue_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -909,18 +907,18 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEnter {
 			issueID := issue.ID
-			cmd := fmt.Sprintf("bd close %s", issueID)
+			args := []string{"close", issueID}
 			if reason != "" {
-				cmd += fmt.Sprintf(" --reason %q", reason)
+				args = append(args, "--reason", reason)
 			}
-			log.Printf("BD COMMAND: Closing issue (Enter): %s", cmd)
-			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			log.Printf("BD COMMAND: Closing issue (Enter): bd %s", strings.Join(args, " "))
+			closedIssue, err := execBdJSONIssue(args...)
 			if err != nil {
-				log.Printf("BD COMMAND ERROR: Close failed: %v, output: %s", err, string(output))
+				log.Printf("BD COMMAND ERROR: Close failed: %v", err)
 				h.StatusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
 			} else {
-				log.Printf("BD COMMAND: Issue closed successfully")
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", issueID))
+				log.Printf("BD COMMAND: Issue closed successfully: %s", closedIssue.ID)
+				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", closedIssue.ID))
 				h.Pages.RemovePage("close_issue_dialog")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -971,18 +969,18 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 
 	form.AddButton("Reopen Issue", func() {
 		issueID := issue.ID // Capture before potential refresh
-		cmd := fmt.Sprintf("bd reopen %s", issueID)
+		args := []string{"reopen", issueID}
 		if reason != "" {
-			cmd += fmt.Sprintf(" --reason %q", reason)
+			args = append(args, "--reason", reason)
 		}
-		log.Printf("BD COMMAND: Reopening issue: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		log.Printf("BD COMMAND: Reopening issue: bd %s", strings.Join(args, " "))
+		reopenedIssue, err := execBdJSONIssue(args...)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Reopen failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Reopen failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Issue reopened successfully")
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", issueID))
+			log.Printf("BD COMMAND: Issue reopened successfully: %s", reopenedIssue.ID)
+			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", reopenedIssue.ID))
 			h.Pages.RemovePage("reopen_issue_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -1005,18 +1003,18 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEnter {
 			issueID := issue.ID
-			cmd := fmt.Sprintf("bd reopen %s", issueID)
+			args := []string{"reopen", issueID}
 			if reason != "" {
-				cmd += fmt.Sprintf(" --reason %q", reason)
+				args = append(args, "--reason", reason)
 			}
-			log.Printf("BD COMMAND: Reopening issue (Enter): %s", cmd)
-			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			log.Printf("BD COMMAND: Reopening issue (Enter): bd %s", strings.Join(args, " "))
+			reopenedIssue, err := execBdJSONIssue(args...)
 			if err != nil {
-				log.Printf("BD COMMAND ERROR: Reopen failed: %v, output: %s", err, string(output))
+				log.Printf("BD COMMAND ERROR: Reopen failed: %v", err)
 				h.StatusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
 			} else {
-				log.Printf("BD COMMAND: Issue reopened successfully")
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", issueID))
+				log.Printf("BD COMMAND: Issue reopened successfully: %s", reopenedIssue.ID)
+				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", reopenedIssue.ID))
 				h.Pages.RemovePage("reopen_issue_dialog")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -1137,22 +1135,30 @@ func (h *DialogHelpers) ShowEditForm() {
 			return
 		}
 
-		cmd := fmt.Sprintf("bd update %s --title \"$(cat %s)\" --description \"$(cat %s)\" --design \"$(cat %s)\" --acceptance \"$(cat %s)\" --notes \"$(cat %s)\" --priority %d --type %s",
+		cmd := fmt.Sprintf("bd update %s --title \"$(cat %s)\" --description \"$(cat %s)\" --design \"$(cat %s)\" --acceptance \"$(cat %s)\" --notes \"$(cat %s)\" --priority %d --type %s --json",
 			issueID, titleFile, descFile, designFile, acceptFile, notesFile, priority, issueType)
 
-		log.Printf("BD COMMAND: Updating issue: %s", cmd)
+		log.Printf("BD COMMAND: Updating issue: bd update %s ...", issueID)
 		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Update failed: %v, output: %s", err, string(output))
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error updating issue: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Issue updated successfully")
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [white]%s[-]", issueID))
-			h.Pages.RemovePage("edit_form")
-			h.App.SetFocus(h.IssueList)
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			// Parse JSON response to verify success
+			result, parseErr := parseBdJSON(output)
+			if parseErr != nil {
+				log.Printf("BD COMMAND ERROR: Failed to parse response: %v", parseErr)
+				h.StatusBar.SetText(fmt.Sprintf("[red]Error parsing response: %v[-]", parseErr))
+			} else if len(result.Issues) > 0 {
+				updatedIssue := result.Issues[0]
+				log.Printf("BD COMMAND: Issue updated successfully: %s", updatedIssue.Title)
+				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [white]%s[-]", updatedIssue.ID))
+				h.Pages.RemovePage("edit_form")
+				h.App.SetFocus(h.IssueList)
+				time.AfterFunc(500*time.Millisecond, func() {
+					h.RefreshIssues(issueID)
+				})
+			}
 		}
 	}
 
