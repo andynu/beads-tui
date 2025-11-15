@@ -142,6 +142,9 @@ func main() {
 	// Layout orientation: true = vertical, false = horizontal (default)
 	var verticalLayout bool
 
+	// Detail pane visibility (default: true)
+	var detailPaneVisible = true
+
 	// Track currently displayed issue in detail panel (for clipboard copy)
 	var currentDetailIssue *parser.Issue
 
@@ -370,7 +373,11 @@ func main() {
 	buildLayout := func() *tview.Flex {
 		var contentFlex *tview.Flex
 
-		if verticalLayout {
+		if !detailPaneVisible {
+			// Detail pane hidden: show only issue list
+			contentFlex = tview.NewFlex().
+				AddItem(issueList, 0, 1, true)
+		} else if verticalLayout {
 			// Vertical: list on top (40%), details on bottom (60%)
 			contentFlex = tview.NewFlex().
 				SetDirection(tview.FlexRow).
@@ -594,9 +601,13 @@ func main() {
 		if detailPanelFocused {
 			switch event.Key() {
 			case tcell.KeyEscape:
-				// Return focus to issue list
+				// Hide detail pane and return focus to issue list
+				detailPaneVisible = false
 				detailPanelFocused = false
-				updatePanelFocus()
+				newFlex := buildLayout()
+				pages.RemovePage("main")
+				pages.AddPage("main", newFlex, true, true)
+				statusBar.SetText(getStatusBarText())
 				return nil
 			case tcell.KeyCtrlD:
 				// Scroll down half page
@@ -657,10 +668,18 @@ func main() {
 			updatePanelFocus()
 			return nil
 		case tcell.KeyEnter:
-			// If on an issue, focus detail panel (alternative to Tab)
+			// If on an issue, show detail pane and focus it
 			if _, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+				if !detailPaneVisible {
+					// Show detail pane
+					detailPaneVisible = true
+					newFlex := buildLayout()
+					pages.RemovePage("main")
+					pages.AddPage("main", newFlex, true, true)
+				}
 				detailPanelFocused = true
 				updatePanelFocus()
+				statusBar.SetText(getStatusBarText())
 				return nil
 			}
 			return event
