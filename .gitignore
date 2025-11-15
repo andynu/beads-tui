@@ -36,4 +36,13 @@ Thumbs.db
 .beads/beads.db
 .beads/bd.sock
 .beads/*.log
+
+# Beads merge conflict artifacts (created during bd merge)
+.beads/beads.left.jsonl
+.beads/beads.left.meta.json
+.beads/beads.base.jsonl
+.beads/beads.base.meta.json
+.beads/beads.right.jsonl
+.beads/beads.right.meta.json
+
 tags
