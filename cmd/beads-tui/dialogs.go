@@ -1325,6 +1325,8 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 	currentTheme := theme.Current()
 	form.SetFieldBackgroundColor(currentTheme.InputFieldBackground())
 	form.SetFieldTextColor(currentTheme.AppForeground())
+	form.SetButtonBackgroundColor(currentTheme.SelectionBg())
+	form.SetButtonTextColor(currentTheme.SelectionFg())
 
 	var title, description, priority, issueType string
 	priority = "2" // Default to P2
@@ -1393,11 +1395,11 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 
 	// Add form fields with wide labels that force wrapping
 	// This makes inputs appear below labels with full width
-	form.AddInputField("Title                                                                                   ", "", 0, nil, func(text string) {
+	form.AddInputField("Title                                                                                   ", "", 60, nil, func(text string) {
 		title = text
 		updateFromText()
 	})
-	form.AddTextArea("Description                                                                             ", "", 0, 5, 0, func(text string) {
+	form.AddTextArea("Description                                                                             ", "", 60, 5, 0, func(text string) {
 		description = text
 		updateFromText()
 	})
