@@ -1,36 +1,31 @@
 package formatting
 
-import "github.com/andy/beads-tui/internal/parser"
+import (
+	"github.com/andy/beads-tui/internal/parser"
+	"github.com/andy/beads-tui/internal/theme"
+)
 
 // GetPriorityColor returns a tview color code for the given priority level
 func GetPriorityColor(priority int) string {
-	switch priority {
-	case 0:
-		return "red" // Critical - bright red
-	case 1:
-		return "orangered" // High - orange-red for urgency
-	case 2:
-		return "lightskyblue" // Normal - calm blue
-	case 3:
-		return "darkgray" // Low - subdued gray
-	case 4:
-		return "gray" // Lowest - very subdued
-	default:
-		return "white"
+	colors := theme.Current().PriorityColors()
+	if priority >= 0 && priority < len(colors) {
+		return colors[priority]
 	}
+	return "white"
 }
 
 // GetStatusColor returns a tview color code for the given status
 func GetStatusColor(status parser.Status) string {
+	t := theme.Current()
 	switch status {
 	case parser.StatusOpen:
-		return "limegreen" // Open - bright green for ready work
+		return t.StatusOpen()
 	case parser.StatusInProgress:
-		return "deepskyblue" // In Progress - vibrant blue for active work
+		return t.StatusInProgress()
 	case parser.StatusBlocked:
-		return "gold" // Blocked - gold/yellow for warning
+		return t.StatusBlocked()
 	case parser.StatusClosed:
-		return "darkgray" // Closed - muted gray
+		return t.StatusClosed()
 	default:
 		return "white"
 	}
@@ -56,16 +51,52 @@ func GetTypeIcon(issueType parser.IssueType) string {
 
 // GetDependencyColor returns a tview color code for the given dependency type
 func GetDependencyColor(depType parser.DependencyType) string {
+	t := theme.Current()
 	switch depType {
 	case parser.DepBlocks:
-		return "red"
+		return t.DepBlocks()
 	case parser.DepRelated:
-		return "blue"
+		return t.DepRelated()
 	case parser.DepParentChild:
-		return "green"
+		return t.DepParentChild()
 	case parser.DepDiscoveredFrom:
-		return "yellow"
+		return t.DepDiscoveredFrom()
 	default:
 		return "white"
 	}
+}
+
+// GetSuccessColor returns the theme's success color
+func GetSuccessColor() string {
+	return theme.Current().Success()
+}
+
+// GetErrorColor returns the theme's error color
+func GetErrorColor() string {
+	return theme.Current().Error()
+}
+
+// GetWarningColor returns the theme's warning color
+func GetWarningColor() string {
+	return theme.Current().Warning()
+}
+
+// GetInfoColor returns the theme's info color
+func GetInfoColor() string {
+	return theme.Current().Info()
+}
+
+// GetMutedColor returns the theme's muted color
+func GetMutedColor() string {
+	return theme.Current().Muted()
+}
+
+// GetEmphasisColor returns the theme's emphasis color
+func GetEmphasisColor() string {
+	return theme.Current().Emphasis()
+}
+
+// GetAccentColor returns the theme's accent color
+func GetAccentColor() string {
+	return theme.Current().Accent()
 }

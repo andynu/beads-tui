@@ -17,6 +17,8 @@ import (
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
 	"github.com/andy/beads-tui/internal/storage"
+	"github.com/andy/beads-tui/internal/theme"
+	_ "github.com/andy/beads-tui/internal/theme" // Import to register default theme
 	"github.com/andy/beads-tui/internal/ui"
 	"github.com/andy/beads-tui/internal/watcher"
 	"github.com/atotto/clipboard"
@@ -27,7 +29,22 @@ import (
 func main() {
 	// Parse command line flags
 	debugMode := flag.Bool("debug", false, "Enable debug logging to file")
+	themeName := flag.String("theme", "", "Color theme (default, gruvbox-dark, etc)")
 	flag.Parse()
+
+	// Set theme if specified
+	if *themeName != "" {
+		if err := theme.SetCurrent(*themeName); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v, using default theme\n", err)
+		}
+	}
+
+	// Check environment variable for theme
+	if envTheme := os.Getenv("BEADS_THEME"); envTheme != "" && *themeName == "" {
+		if err := theme.SetCurrent(envTheme); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v, using default theme\n", err)
+		}
+	}
 
 	// Set up logging
 	var logFile *os.File

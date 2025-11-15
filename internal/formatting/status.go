@@ -46,6 +46,7 @@ func GetStatusBarText(
 		closedText = " [Showing Closed]"
 	}
 
-	return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
-		beadsDir, visibleCount, filterText, closedText, viewModeStr, mouseStr, focusStr)
+	emphasisColor := GetEmphasisColor()
+	return fmt.Sprintf("[%s]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
+		emphasisColor, beadsDir, visibleCount, filterText, closedText, viewModeStr, mouseStr, focusStr)
 }

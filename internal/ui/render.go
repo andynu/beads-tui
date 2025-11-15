@@ -24,7 +24,8 @@ func PopulateIssueList(
 	// Check view mode
 	if appState.GetViewMode() == state.ViewTree {
 		// Tree view
-		issueList.AddItem("[cyan::b]DEPENDENCY TREE[-::-]", "", 0, nil)
+		accentColor := formatting.GetAccentColor()
+		issueList.AddItem(fmt.Sprintf("[%s::b]DEPENDENCY TREE[-::-]", accentColor), "", 0, nil)
 		currentIndex++
 
 		treeNodes := appState.GetTreeNodes()
@@ -37,7 +38,8 @@ func PopulateIssueList(
 		// Add ready issues
 		readyIssues := appState.GetReadyIssues()
 		if len(readyIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("[limegreen::b]⬤ READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+			openColor := formatting.GetStatusColor(parser.StatusOpen)
+			issueList.AddItem(fmt.Sprintf("[%s::b]⬤ READY (%d)[-::-]", openColor, len(readyIssues)), "", 0, nil)
 			currentIndex++
 
 			for _, issue := range readyIssues {
@@ -51,7 +53,8 @@ func PopulateIssueList(
 		// Add blocked issues
 		blockedIssues := appState.GetBlockedIssues()
 		if len(blockedIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("\n[gold::b]⬤ BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
+			blockedColor := formatting.GetStatusColor(parser.StatusBlocked)
+			issueList.AddItem(fmt.Sprintf("\n[%s::b]⬤ BLOCKED (%d)[-::-]", blockedColor, len(blockedIssues)), "", 0, nil)
 			currentIndex++
 
 			for _, issue := range blockedIssues {
@@ -65,7 +68,8 @@ func PopulateIssueList(
 		// Add in-progress issues
 		inProgressIssues := appState.GetInProgressIssues()
 		if len(inProgressIssues) > 0 {
-			issueList.AddItem(fmt.Sprintf("\n[deepskyblue::b]⬤ IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+			inProgressColor := formatting.GetStatusColor(parser.StatusInProgress)
+			issueList.AddItem(fmt.Sprintf("\n[%s::b]⬤ IN PROGRESS (%d)[-::-]", inProgressColor, len(inProgressIssues)), "", 0, nil)
 			currentIndex++
 
 			for _, issue := range inProgressIssues {
@@ -80,7 +84,8 @@ func PopulateIssueList(
 		if showClosedIssues {
 			closedIssues := appState.GetClosedIssues()
 			if len(closedIssues) > 0 {
-				issueList.AddItem(fmt.Sprintf("\n[gray::b]⬤ CLOSED (%d)[-::-]", len(closedIssues)), "", 0, nil)
+				closedColor := formatting.GetStatusColor(parser.StatusClosed)
+				issueList.AddItem(fmt.Sprintf("\n[%s::b]⬤ CLOSED (%d)[-::-]", closedColor, len(closedIssues)), "", 0, nil)
 				currentIndex++
 
 				for _, issue := range closedIssues {
@@ -105,7 +110,8 @@ func formatIssueListItem(issue *parser.Issue, statusIcon string) string {
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {
-		text += " [gray]"
+		mutedColor := formatting.GetMutedColor()
+		text += fmt.Sprintf(" [%s]", mutedColor)
 		for i, label := range issue.Labels {
 			if i > 0 {
 				text += " "
@@ -165,7 +171,8 @@ func renderTreeNode(
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {
-		text += " [gray]"
+		mutedColor := formatting.GetMutedColor()
+		text += fmt.Sprintf(" [%s]", mutedColor)
 		for i, label := range issue.Labels {
 			if i > 0 {
 				text += " "
