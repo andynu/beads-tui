@@ -1322,9 +1322,10 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 	form.SetItemPadding(1) // Add spacing between fields
 
 	// Set field colors to ensure visibility
+	// Use selection background for maximum contrast
 	currentTheme := theme.Current()
-	form.SetFieldBackgroundColor(currentTheme.InputFieldBackground())
-	form.SetFieldTextColor(currentTheme.AppForeground())
+	form.SetFieldBackgroundColor(currentTheme.SelectionBg())
+	form.SetFieldTextColor(currentTheme.SelectionFg())
 	form.SetButtonBackgroundColor(currentTheme.SelectionBg())
 	form.SetButtonTextColor(currentTheme.SelectionFg())
 
