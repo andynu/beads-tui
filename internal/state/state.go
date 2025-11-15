@@ -291,20 +291,41 @@ func (s *State) buildDependencyTree() {
 		}
 	}
 
-	// Second pass: find root nodes (issues with no incoming dependencies)
-	var rootIssues []*parser.Issue
+	// Second pass: find root nodes
+	// Epics are always root nodes (even if they have dependencies)
+	// Non-epics are roots only if they have no incoming dependencies
+	var epicRoots []*parser.Issue
+	var regularRoots []*parser.Issue
+
 	for _, issue := range s.issues {
-		if issue.Status != parser.StatusClosed && !hasIncomingDep[issue.ID] {
-			rootIssues = append(rootIssues, issue)
+		if issue.Status == parser.StatusClosed {
+			continue
+		}
+
+		if issue.IssueType == parser.TypeEpic {
+			epicRoots = append(epicRoots, issue)
+		} else if !hasIncomingDep[issue.ID] {
+			regularRoots = append(regularRoots, issue)
 		}
 	}
 
 	// Build tree recursively from roots
+	// First add epics (they get top priority)
 	visited := make(map[string]bool)
-	for _, root := range rootIssues {
-		node := s.buildTreeNode(root, 0, childrenMap, blockedByMap, visited)
+	for _, epic := range epicRoots {
+		node := s.buildTreeNode(epic, 0, childrenMap, blockedByMap, visited)
 		if node != nil {
 			s.treeNodes = append(s.treeNodes, node)
+		}
+	}
+
+	// Then add regular root issues that weren't already visited as children of epics
+	for _, root := range regularRoots {
+		if !visited[root.ID] {
+			node := s.buildTreeNode(root, 0, childrenMap, blockedByMap, visited)
+			if node != nil {
+				s.treeNodes = append(s.treeNodes, node)
+			}
 		}
 	}
 }

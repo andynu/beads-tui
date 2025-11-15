@@ -727,3 +727,94 @@ func TestSelectedIssue(t *testing.T) {
 		t.Error("Expected no selected issue after clearing")
 	}
 }
+
+func TestEpicsAlwaysAtRootLevel(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	// Create an epic with a blocking dependency
+	// Epic should still appear at root level even though it has an incoming dependency
+	issues := []*parser.Issue{
+		{
+			ID:        "test-blocker",
+			Title:     "Blocker Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "test-epic",
+			Title:     "Epic with Blocker",
+			Status:    parser.StatusOpen,
+			Priority:  0,
+			IssueType: parser.TypeEpic,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-epic",
+					DependsOnID: "test-blocker",
+					Type:        parser.DepBlocks,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "test-child",
+			Title:     "Child of Epic",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "test-child",
+					DependsOnID: "test-epic",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+	}
+
+	state.LoadIssues(issues)
+	state.SetViewMode(ViewTree)
+
+	treeNodes := state.GetTreeNodes()
+
+	// Should have 2 root nodes: the epic (always at root) and the blocker (no dependencies)
+	if len(treeNodes) != 2 {
+		t.Errorf("Expected 2 root nodes (epic + blocker), got %d", len(treeNodes))
+	}
+
+	// Find the epic node
+	var epicNode *TreeNode
+	for _, node := range treeNodes {
+		if node.Issue.IssueType == parser.TypeEpic {
+			epicNode = node
+			break
+		}
+	}
+
+	if epicNode == nil {
+		t.Fatal("Expected to find epic at root level")
+	}
+
+	if epicNode.Issue.ID != "test-epic" {
+		t.Errorf("Expected epic to be test-epic, got %s", epicNode.Issue.ID)
+	}
+
+	// Epic should have 1 child
+	if len(epicNode.Children) != 1 {
+		t.Errorf("Expected epic to have 1 child, got %d", len(epicNode.Children))
+	}
+
+	if epicNode.Children[0].Issue.ID != "test-child" {
+		t.Errorf("Expected epic's child to be test-child, got %s", epicNode.Children[0].Issue.ID)
+	}
+}
