@@ -18,7 +18,7 @@ A powerful terminal user interface for the [beads](https://github.com/steveyegge
 
 ### Editing & Management
 - **Full CRUD operations** - Create, edit, close, and reopen issues without leaving the TUI
-- **$EDITOR integration** - Edit title, description, design, acceptance criteria, and notes in your preferred editor
+- **Full-field editing** - Edit title, description, design, acceptance criteria, and notes via modal dialog (`e` key)
 - **Quick updates** - Instant priority (0-4) and status (s) changes with single keypress
 - **Comment system** - Add comments to issues directly from the TUI
 - **Dependency management** - Add/remove blocks, parent-child, and related dependencies via dialog
@@ -247,16 +247,11 @@ Ensure you're in a directory with a `.beads` folder:
 bd init --quiet  # Initialize beads if needed
 ```
 
-### Editor integration not working
+### Editor integration
 
-The TUI uses `$EDITOR` environment variable (falls back to `vim`):
+The TUI uses built-in text areas for editing. Press `e` to open the edit dialog with fields for title, description, design, acceptance criteria, and notes.
 
-```bash
-export EDITOR=vim        # or nano, emacs, code --wait, etc.
-./beads-tui
-```
-
-Ensure your editor is in `$PATH` and executable.
+> **Note:** External `$EDITOR` integration is planned but not yet implemented. See `tui-qxy.1` in the issue tracker.
 
 ## Development
 
