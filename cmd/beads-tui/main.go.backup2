@@ -19,7 +19,7 @@ import (
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
 	"github.com/andy/beads-tui/internal/storage"
-	"github.com/andy/beads-tui/internal/ui"
+	_ "github.com/andy/beads-tui/internal/ui" // TODO: use when closures converted
 	"github.com/andy/beads-tui/internal/watcher"
 	"github.com/atotto/clipboard"
 	"github.com/gdamore/tcell/v2"
@@ -162,9 +162,203 @@ func main() {
 			beadsDir, visibleCount, filterText, closedText, viewModeStr, mouseStr, focusStr)
 	}
 
+	// Helper function to render tree node recursively
+	var renderTreeNode func(node *state.TreeNode, prefix string, isLast bool, currentIndex *int)
+	renderTreeNode = func(node *state.TreeNode, prefix string, isLast bool, currentIndex *int) {
+		issue := node.Issue
+
+		// Determine branch characters
+		var branch, continuation string
+		if node.Depth == 0 {
+			branch = ""
+			continuation = ""
+		} else {
+			if isLast {
+				branch = "└── "
+				continuation = "    "
+			} else {
+				branch = "├── "
+				continuation = "│   "
+			}
+		}
+
+		// Get status indicator
+		var statusIcon string
+		switch issue.Status {
+		case parser.StatusOpen:
+			statusIcon = "●"
+		case parser.StatusBlocked:
+			statusIcon = "○"
+		case parser.StatusInProgress:
+			statusIcon = "◆"
+		default:
+			statusIcon = "·"
+		}
+
+		// Format issue line
+		priorityColor := formatting.GetPriorityColor(issue.Priority)
+		statusColor := formatting.GetStatusColor(issue.Status)
+		text := fmt.Sprintf("%s%s[%s]%s[-] [%s]%s[-] [P%d] %s",
+			prefix, branch, statusColor, statusIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
+
+		// Add labels if present
+		if len(issue.Labels) > 0 {
+			text += " [gray]"
+			for i, label := range issue.Labels {
+				if i > 0 {
+					text += " "
+				}
+				text += "#" + label
+			}
+			text += "[-]"
+		}
+
+		issueList.AddItem(text, "", 0, nil)
+		indexToIssue[*currentIndex] = issue
+		*currentIndex++
+
+		// Render children
+		for i, child := range node.Children {
+			isLastChild := i == len(node.Children)-1
+			newPrefix := prefix + continuation
+			renderTreeNode(child, newPrefix, isLastChild, currentIndex)
+		}
+	}
+
 	// Helper function to populate issue list from state
 	populateIssueList := func() {
-		indexToIssue = ui.PopulateIssueList(issueList, appState, showClosedIssues)
+		// Clear and rebuild issue list
+		issueList.Clear()
+		indexToIssue = make(map[int]*parser.Issue)
+		currentIndex := 0
+
+		// Check view mode
+		if appState.GetViewMode() == state.ViewTree {
+			// Tree view
+			issueList.AddItem("[cyan::b]DEPENDENCY TREE[-::-]", "", 0, nil)
+			currentIndex++
+
+			treeNodes := appState.GetTreeNodes()
+			for i, node := range treeNodes {
+				isLast := i == len(treeNodes)-1
+				renderTreeNode(node, "", isLast, &currentIndex)
+			}
+		} else {
+			// List view (original behavior)
+			// Add ready issues
+			readyIssues := appState.GetReadyIssues()
+			if len(readyIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("[limegreen::b]⬤ READY (%d)[-::-]", len(readyIssues)), "", 0, nil)
+				currentIndex++
+
+				for _, issue := range readyIssues {
+					priorityColor := formatting.GetPriorityColor(issue.Priority)
+					typeIcon := formatting.GetTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]●[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [gray]"
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += " "
+							}
+							text += "#" + label
+						}
+						text += "[-]"
+					}
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
+			}
+
+			// Add blocked issues
+			blockedIssues := appState.GetBlockedIssues()
+			if len(blockedIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("\n[gold::b]⬤ BLOCKED (%d)[-::-]", len(blockedIssues)), "", 0, nil)
+				currentIndex++
+
+				for _, issue := range blockedIssues {
+					priorityColor := formatting.GetPriorityColor(issue.Priority)
+					typeIcon := formatting.GetTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]○[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [gray]"
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += " "
+							}
+							text += "#" + label
+						}
+						text += "[-]"
+					}
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
+			}
+
+			// Add in-progress issues
+			inProgressIssues := appState.GetInProgressIssues()
+			if len(inProgressIssues) > 0 {
+				issueList.AddItem(fmt.Sprintf("\n[deepskyblue::b]⬤ IN PROGRESS (%d)[-::-]", len(inProgressIssues)), "", 0, nil)
+				currentIndex++
+
+				for _, issue := range inProgressIssues {
+					priorityColor := formatting.GetPriorityColor(issue.Priority)
+					typeIcon := formatting.GetTypeIcon(issue.IssueType)
+					text := fmt.Sprintf("  [%s]◆[-] %s %s [P%d] %s",
+						priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
+					// Add labels if present
+					if len(issue.Labels) > 0 {
+						text += " [gray]"
+						for i, label := range issue.Labels {
+							if i > 0 {
+								text += " "
+							}
+							text += "#" + label
+						}
+						text += "[-]"
+					}
+					issueList.AddItem(text, "", 0, nil)
+					indexToIssue[currentIndex] = issue
+					currentIndex++
+				}
+			}
+
+			// Add closed issues (only if showClosedIssues is enabled)
+			if showClosedIssues {
+				closedIssues := appState.GetClosedIssues()
+				if len(closedIssues) > 0 {
+					issueList.AddItem(fmt.Sprintf("\n[gray::b]⬤ CLOSED (%d)[-::-]", len(closedIssues)), "", 0, nil)
+					currentIndex++
+
+					for _, issue := range closedIssues {
+						priorityColor := formatting.GetPriorityColor(issue.Priority)
+						typeIcon := formatting.GetTypeIcon(issue.IssueType)
+						text := fmt.Sprintf("  [%s]✓[-] %s %s [P%d] %s",
+							priorityColor, typeIcon, issue.ID, issue.Priority, issue.Title)
+						// Add labels if present
+						if len(issue.Labels) > 0 {
+							text += " [gray]"
+							for i, label := range issue.Labels {
+								if i > 0 {
+									text += " "
+								}
+								text += "#" + label
+							}
+							text += "[-]"
+						}
+						issueList.AddItem(text, "", 0, nil)
+						indexToIssue[currentIndex] = issue
+						currentIndex++
+					}
+				}
+			}
+		}
 	}
 
 	// Function to load and display issues (for async updates after app starts)
@@ -445,20 +639,103 @@ func main() {
 	}
 
 	// Helper function to show comment dialog
-	// Create dialog helpers for all dialog functions
-	dialogHelpers := &DialogHelpers{
-		App:           app,
-		Pages:         pages,
-		IssueList:     issueList,
-		IndexToIssue:  &indexToIssue,
-		StatusBar:     statusBar,
-		AppState:      appState,
-		RefreshIssues: refreshIssues,
-	}
-
-	// Helper function to show comment dialog
 	showCommentDialog := func() {
-		dialogHelpers.ShowCommentDialog()
+		// Get current issue
+		currentIndex := issueList.GetCurrentItem()
+		issue, ok := indexToIssue[currentIndex]
+		if !ok {
+			statusBar.SetText("[red]No issue selected[-]")
+			return
+		}
+
+		form := tview.NewForm()
+		var commentText string
+
+		form.AddTextView("Adding comment to", issue.ID+" - "+issue.Title, 0, 2, false, false)
+		form.AddTextArea("Comment", "", 60, 8, 0, func(text string) {
+			commentText = text
+		})
+
+		form.AddButton("Save (Ctrl-S)", func() {
+			if commentText == "" {
+				statusBar.SetText("[red]Error: Comment cannot be empty[-]")
+				return
+			}
+
+			// Execute bd comment command
+			cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
+			log.Printf("BD COMMAND: Adding comment: %s", cmd)
+			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			if err != nil {
+				log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+				statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+			} else {
+				log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+				statusBar.SetText("[limegreen]✓ Comment added successfully[-]")
+
+				// Close dialog
+				pages.RemovePage("comment_dialog")
+				app.SetFocus(issueList)
+
+				// Refresh issues after a short delay, preserving selection
+				issueID := issue.ID
+				time.AfterFunc(500*time.Millisecond, func() {
+					refreshIssues(issueID)
+				})
+			}
+		})
+		form.AddButton("Cancel", func() {
+			pages.RemovePage("comment_dialog")
+			app.SetFocus(issueList)
+		})
+
+		form.SetBorder(true).SetTitle(" Add Comment ").SetTitleAlign(tview.AlignCenter)
+		form.SetCancelFunc(func() {
+			pages.RemovePage("comment_dialog")
+			app.SetFocus(issueList)
+		})
+
+		// Add Ctrl-S handler for save
+		form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlS {
+				// Save comment directly
+				if commentText == "" {
+					statusBar.SetText("[red]Error: Comment cannot be empty[-]")
+					return nil
+				}
+
+				cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
+				log.Printf("BD COMMAND: Adding comment: %s", cmd)
+				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				if err != nil {
+					log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+					statusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+				} else {
+					log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+					statusBar.SetText("[limegreen]✓ Comment added successfully[-]")
+					pages.RemovePage("comment_dialog")
+					app.SetFocus(issueList)
+					issueID := issue.ID
+					time.AfterFunc(500*time.Millisecond, func() {
+						refreshIssues(issueID)
+					})
+				}
+				return nil
+			}
+			return event
+		})
+
+		// Create modal (centered)
+		modal := tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(form, 0, 3, true).
+				AddItem(nil, 0, 1, false), 0, 3, true).
+			AddItem(nil, 0, 1, false)
+
+		pages.AddPage("comment_dialog", modal, true, true)
+		app.SetFocus(form)
 	}
 
 	// Helper function to show rename dialog
