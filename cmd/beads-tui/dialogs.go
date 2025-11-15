@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andy/beads-tui/internal/formatting"
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
 	"github.com/gdamore/tcell/v2"
@@ -32,7 +33,7 @@ func (h *DialogHelpers) ShowCommentDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
@@ -46,7 +47,7 @@ func (h *DialogHelpers) ShowCommentDialog() {
 
 	form.AddButton("Save (Ctrl-S)", func() {
 		if commentText == "" {
-			h.StatusBar.SetText("[red]Error: Comment cannot be empty[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Comment cannot be empty[-]", formatting.GetErrorColor()))
 			return
 		}
 
@@ -55,10 +56,10 @@ func (h *DialogHelpers) ShowCommentDialog() {
 		comment, err := execBdJSONComment("comment", issue.ID, commentText)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Comment failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error adding comment: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Comment added successfully: ID %d", comment.ID)
-			h.StatusBar.SetText("[limegreen]✓ Comment added successfully[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Comment added successfully[-]", formatting.GetSuccessColor()))
 
 			// Close dialog
 			h.Pages.RemovePage("comment_dialog")
@@ -87,7 +88,7 @@ func (h *DialogHelpers) ShowCommentDialog() {
 		if event.Key() == tcell.KeyCtrlS {
 			// Save comment directly
 			if commentText == "" {
-				h.StatusBar.SetText("[red]Error: Comment cannot be empty[-]")
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Comment cannot be empty[-]", formatting.GetErrorColor()))
 				return nil
 			}
 
@@ -95,10 +96,10 @@ func (h *DialogHelpers) ShowCommentDialog() {
 			comment, err := execBdJSONComment("comment", issue.ID, commentText)
 			if err != nil {
 				log.Printf("BD COMMAND ERROR: Comment failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error adding comment: %v[-]", formatting.GetErrorColor(), err))
 			} else {
 				log.Printf("BD COMMAND: Comment added successfully: ID %d", comment.ID)
-				h.StatusBar.SetText("[limegreen]✓ Comment added successfully[-]")
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Comment added successfully[-]", formatting.GetSuccessColor()))
 				h.Pages.RemovePage("comment_dialog")
 				h.App.SetFocus(h.IssueList)
 				issueID := issue.ID
@@ -130,7 +131,7 @@ func (h *DialogHelpers) ShowRenameDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
@@ -144,7 +145,7 @@ func (h *DialogHelpers) ShowRenameDialog() {
 
 	form.AddButton("Save (Ctrl-S)", func() {
 		if newTitle == "" {
-			h.StatusBar.SetText("[red]Error: Title cannot be empty[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Title cannot be empty[-]", formatting.GetErrorColor()))
 			return
 		}
 
@@ -153,10 +154,10 @@ func (h *DialogHelpers) ShowRenameDialog() {
 		updatedIssue, err := execBdJSONIssue("update", issue.ID, "--title", newTitle)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Rename failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error renaming issue: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error renaming issue: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Issue renamed successfully: %s", updatedIssue.Title)
-			h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", updatedIssue.ID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Renamed %s[-]", formatting.GetSuccessColor(), updatedIssue.ID))
 
 			// Close dialog
 			h.Pages.RemovePage("rename_dialog")
@@ -185,7 +186,7 @@ func (h *DialogHelpers) ShowRenameDialog() {
 		if event.Key() == tcell.KeyCtrlS {
 			// Save directly
 			if newTitle == "" {
-				h.StatusBar.SetText("[red]Error: Title cannot be empty[-]")
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Title cannot be empty[-]", formatting.GetErrorColor()))
 				return nil
 			}
 
@@ -193,10 +194,10 @@ func (h *DialogHelpers) ShowRenameDialog() {
 			updatedIssue, err := execBdJSONIssue("update", issue.ID, "--title", newTitle)
 			if err != nil {
 				log.Printf("BD COMMAND ERROR: Rename failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error renaming issue: %v[-]", err))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error renaming issue: %v[-]", formatting.GetErrorColor(), err))
 			} else {
 				log.Printf("BD COMMAND: Issue renamed successfully: %s", updatedIssue.Title)
-				h.StatusBar.SetText(fmt.Sprintf("[green]✓ Renamed %s[-]", updatedIssue.ID))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Renamed %s[-]", formatting.GetSuccessColor(), updatedIssue.ID))
 				h.Pages.RemovePage("rename_dialog")
 				h.App.SetFocus(h.IssueList)
 				issueID := issue.ID
@@ -227,19 +228,23 @@ func (h *DialogHelpers) ShowQuickFilter() {
 	form := tview.NewForm()
 	var filterQuery string
 
-	helpText := `[yellow]Quick Filter Syntax:[-]
+	emphasisColor := formatting.GetEmphasisColor()
+	accentColor := formatting.GetAccentColor()
+	mutedColor := formatting.GetMutedColor()
+
+	helpText := fmt.Sprintf(`[%s]Quick Filter Syntax:[-]
   p0-p4    Priority (e.g., 'p1' or 'p1,p2')
   bug, feature, task, epic, chore    Types
   open, in_progress, blocked, closed    Statuses
   #label   Label (e.g., '#ui' or '#bug,#urgent')
 
-[cyan]Examples:[-]
+[%s]Examples:[-]
   p1 bug          P1 bugs only
   feature,task    Features and tasks
   p0,p1 open      High priority open issues
   #ui #urgent     Issues with 'ui' or 'urgent' labels
 
-[gray]Leave empty to clear all filters[-]`
+[%s]Leave empty to clear all filters[-]`, emphasisColor, accentColor, mutedColor)
 
 	form.AddTextView("", helpText, 0, 11, false, false)
 	form.AddInputField("Filter", "", 50, nil, func(text string) {
@@ -393,46 +398,66 @@ func (h *DialogHelpers) ShowStatsOverlay() {
 
 	// Build stats text
 	var sb strings.Builder
-	sb.WriteString("[yellow::b]Issue Statistics Dashboard[-::-]\n\n")
+	emphasisColor := formatting.GetEmphasisColor()
+	accentColor := formatting.GetAccentColor()
+	mutedColor := formatting.GetMutedColor()
+	priorityColors := [5]string{
+		formatting.GetPriorityColor(0),
+		formatting.GetPriorityColor(1),
+		formatting.GetPriorityColor(2),
+		formatting.GetPriorityColor(3),
+		formatting.GetPriorityColor(4),
+	}
+
+	sb.WriteString(fmt.Sprintf("[%s::b]Issue Statistics Dashboard[-::-]\n\n", emphasisColor))
 
 	// Overall stats
-	sb.WriteString(fmt.Sprintf("[cyan::b]Total Issues:[-::-] %d\n\n", stats.total))
+	sb.WriteString(fmt.Sprintf("[%s::b]Total Issues:[-::-] %d\n\n", accentColor, stats.total))
 
 	// By Status
-	sb.WriteString("[cyan::b]By Status:[-::-]\n")
-	sb.WriteString(fmt.Sprintf("  [limegreen]Ready[-]:        %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("[%s::b]By Status:[-::-]\n", accentColor))
+	sb.WriteString(fmt.Sprintf("  [%s]Ready[-]:        %3d  (%.1f%%)\n",
+		formatting.GetStatusColor(parser.StatusOpen),
 		stats.byStatus[parser.StatusOpen],
 		float64(stats.byStatus[parser.StatusOpen])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [deepskyblue]In Progress[-]: %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("  [%s]In Progress[-]: %3d  (%.1f%%)\n",
+		formatting.GetStatusColor(parser.StatusInProgress),
 		stats.byStatus[parser.StatusInProgress],
 		float64(stats.byStatus[parser.StatusInProgress])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [gold]Blocked[-]:     %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("  [%s]Blocked[-]:     %3d  (%.1f%%)\n",
+		formatting.GetStatusColor(parser.StatusBlocked),
 		stats.byStatus[parser.StatusBlocked],
 		float64(stats.byStatus[parser.StatusBlocked])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [gray]Closed[-]:      %3d  (%.1f%%)\n\n",
+	sb.WriteString(fmt.Sprintf("  [%s]Closed[-]:      %3d  (%.1f%%)\n\n",
+		formatting.GetStatusColor(parser.StatusClosed),
 		stats.byStatus[parser.StatusClosed],
 		float64(stats.byStatus[parser.StatusClosed])/float64(stats.total)*100))
 
 	// By Priority
-	sb.WriteString("[cyan::b]By Priority:[-::-]\n")
-	sb.WriteString(fmt.Sprintf("  [red]P0 (Critical)[-]: %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("[%s::b]By Priority:[-::-]\n", accentColor))
+	sb.WriteString(fmt.Sprintf("  [%s]P0 (Critical)[-]: %3d  (%.1f%%)\n",
+		priorityColors[0],
 		stats.byPriority[0],
 		float64(stats.byPriority[0])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [orangered]P1 (High)[-]:     %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("  [%s]P1 (High)[-]:     %3d  (%.1f%%)\n",
+		priorityColors[1],
 		stats.byPriority[1],
 		float64(stats.byPriority[1])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [lightskyblue]P2 (Normal)[-]:   %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("  [%s]P2 (Normal)[-]:   %3d  (%.1f%%)\n",
+		priorityColors[2],
 		stats.byPriority[2],
 		float64(stats.byPriority[2])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [gray]P3 (Low)[-]:      %3d  (%.1f%%)\n",
+	sb.WriteString(fmt.Sprintf("  [%s]P3 (Low)[-]:      %3d  (%.1f%%)\n",
+		priorityColors[3],
 		stats.byPriority[3],
 		float64(stats.byPriority[3])/float64(stats.total)*100))
-	sb.WriteString(fmt.Sprintf("  [gray]P4 (Lowest)[-]:   %3d  (%.1f%%)\n\n",
+	sb.WriteString(fmt.Sprintf("  [%s]P4 (Lowest)[-]:   %3d  (%.1f%%)\n\n",
+		priorityColors[4],
 		stats.byPriority[4],
 		float64(stats.byPriority[4])/float64(stats.total)*100))
 
 	// By Type
-	sb.WriteString("[cyan::b]By Type:[-::-]\n")
+	sb.WriteString(fmt.Sprintf("[%s::b]By Type:[-::-]\n", accentColor))
 	sb.WriteString(fmt.Sprintf("  Bug:      %3d  (%.1f%%)\n",
 		stats.byType[parser.TypeBug],
 		float64(stats.byType[parser.TypeBug])/float64(stats.total)*100))
@@ -450,12 +475,12 @@ func (h *DialogHelpers) ShowStatsOverlay() {
 		float64(stats.byType[parser.TypeChore])/float64(stats.total)*100))
 
 	// Dependencies
-	sb.WriteString("[cyan::b]Dependencies:[-::-]\n")
+	sb.WriteString(fmt.Sprintf("[%s::b]Dependencies:[-::-]\n", accentColor))
 	sb.WriteString(fmt.Sprintf("  Total:           %d\n", stats.totalDeps))
 	sb.WriteString(fmt.Sprintf("  Avg per issue:   %.2f\n", stats.avgDepsPerIssue))
 
-	sb.WriteString("\n[gray]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n")
-	sb.WriteString("[yellow]Press ESC or S to close[-]")
+	sb.WriteString(fmt.Sprintf("\n[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n", mutedColor))
+	sb.WriteString(fmt.Sprintf("[%s]Press ESC or S to close[-]", emphasisColor))
 
 	// Create stats text view
 	statsTextView := tview.NewTextView().
@@ -492,6 +517,8 @@ func (h *DialogHelpers) ShowStatsOverlay() {
 
 // ShowHelpScreen displays the keyboard shortcuts help screen
 func (h *DialogHelpers) ShowHelpScreen() {
+	// Note: This help screen uses hardcoded colors for documentation purposes
+	// showing the current theme's colors as examples
 	helpText := `[yellow::b]beads-tui Keyboard Shortcuts[-::-]
 
 [cyan::b]Navigation[-::-]
@@ -614,7 +641,7 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
@@ -644,13 +671,13 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 	// Add button
 	form.AddButton("Add Dependency", func() {
 		if targetID == "" {
-			h.StatusBar.SetText("[red]Error: Issue ID required[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Issue ID required[-]", formatting.GetErrorColor()))
 			return
 		}
 
 		// Validate target issue exists
 		if h.AppState.GetIssueByID(targetID) == nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: Issue %s not found[-]", targetID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Issue %s not found[-]", formatting.GetErrorColor(), targetID))
 			return
 		}
 
@@ -659,10 +686,10 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 		updatedIssue, err := execBdJSONIssue("dep", "add", issueID, targetID, "--type", depType)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Dependency add failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding dependency: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error adding dependency: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Dependency added successfully to %s", updatedIssue.ID)
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Added[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depType, targetID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Added [%s]%s[-] dependency to [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), depType, formatting.GetAccentColor(), targetID))
 			h.Pages.RemovePage("dependency_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -684,10 +711,10 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 				updatedIssue, err := execBdJSONIssue("dep", "remove", issueID, depToRemove.DependsOnID, "--type", string(depToRemove.Type))
 				if err != nil {
 					log.Printf("BD COMMAND ERROR: Dependency remove failed: %v", err)
-					h.StatusBar.SetText(fmt.Sprintf("[red]Error removing dependency: %v[-]", err))
+					h.StatusBar.SetText(fmt.Sprintf("[%s]Error removing dependency: %v[-]", formatting.GetErrorColor(), err))
 				} else {
 					log.Printf("BD COMMAND: Dependency removed successfully from %s", updatedIssue.ID)
-					h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depToRemove.Type, depToRemove.DependsOnID))
+					h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Removed [%s]%s[-] dependency to [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), depToRemove.Type, formatting.GetAccentColor(), depToRemove.DependsOnID))
 					h.Pages.RemovePage("dependency_dialog")
 					h.App.SetFocus(h.IssueList)
 					time.AfterFunc(500*time.Millisecond, func() {
@@ -729,7 +756,7 @@ func (h *DialogHelpers) ShowLabelDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
@@ -760,14 +787,14 @@ func (h *DialogHelpers) ShowLabelDialog() {
 	form.AddButton("Add Label", func() {
 		trimmedLabel := strings.TrimSpace(newLabel)
 		if trimmedLabel == "" {
-			h.StatusBar.SetText("[red]Error: Label cannot be empty[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Label cannot be empty[-]", formatting.GetErrorColor()))
 			return
 		}
 
 		// Check if label already exists
 		for _, existing := range issue.Labels {
 			if existing == trimmedLabel {
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error: Label '%s' already exists[-]", trimmedLabel))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Label '%s' already exists[-]", formatting.GetErrorColor(), trimmedLabel))
 				return
 			}
 		}
@@ -777,10 +804,10 @@ func (h *DialogHelpers) ShowLabelDialog() {
 		updatedIssue, err := execBdJSONIssue("label", "add", issueID, trimmedLabel)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Label add failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding label: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error adding label: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Label added successfully to %s", updatedIssue.ID)
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Added label[-] [yellow]'%s'[-]", trimmedLabel))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Added label [%s]'%s'[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), trimmedLabel))
 			h.Pages.RemovePage("label_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -802,10 +829,10 @@ func (h *DialogHelpers) ShowLabelDialog() {
 				updatedIssue, err := execBdJSONIssue("label", "remove", issueID, labelToRemove)
 				if err != nil {
 					log.Printf("BD COMMAND ERROR: Label remove failed: %v", err)
-					h.StatusBar.SetText(fmt.Sprintf("[red]Error removing label: %v[-]", err))
+					h.StatusBar.SetText(fmt.Sprintf("[%s]Error removing label: %v[-]", formatting.GetErrorColor(), err))
 				} else {
 					log.Printf("BD COMMAND: Label removed successfully from %s", updatedIssue.ID)
-					h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed label[-] [yellow]'%s'[-]", labelToRemove))
+					h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Removed label [%s]'%s'[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), labelToRemove))
 					h.Pages.RemovePage("label_dialog")
 					h.App.SetFocus(h.IssueList)
 					time.AfterFunc(500*time.Millisecond, func() {
@@ -847,13 +874,13 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
 	// Don't allow closing already closed issues
 	if issue.Status == parser.StatusClosed {
-		h.StatusBar.SetText("[yellow]Issue is already closed[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]Issue is already closed[-]", formatting.GetWarningColor()))
 		return
 	}
 
@@ -875,10 +902,10 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 		closedIssue, err := execBdJSONIssue(args...)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Close failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error closing issue: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Issue closed successfully: %s", closedIssue.ID)
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", closedIssue.ID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Closed [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), closedIssue.ID))
 			h.Pages.RemovePage("close_issue_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -909,10 +936,10 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 			closedIssue, err := execBdJSONIssue(args...)
 			if err != nil {
 				log.Printf("BD COMMAND ERROR: Close failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error closing issue: %v[-]", err))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error closing issue: %v[-]", formatting.GetErrorColor(), err))
 			} else {
 				log.Printf("BD COMMAND: Issue closed successfully: %s", closedIssue.ID)
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Closed[-] [white]%s[-]", closedIssue.ID))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Closed [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), closedIssue.ID))
 				h.Pages.RemovePage("close_issue_dialog")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -943,13 +970,13 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
 	// Only allow reopening closed issues
 	if issue.Status != parser.StatusClosed {
-		h.StatusBar.SetText("[yellow]Issue is not closed[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]Issue is not closed[-]", formatting.GetWarningColor()))
 		return
 	}
 
@@ -971,10 +998,10 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 		reopenedIssue, err := execBdJSONIssue(args...)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Reopen failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error reopening issue: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Issue reopened successfully: %s", reopenedIssue.ID)
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", reopenedIssue.ID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Reopened [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), reopenedIssue.ID))
 			h.Pages.RemovePage("reopen_issue_dialog")
 			h.App.SetFocus(h.IssueList)
 			time.AfterFunc(500*time.Millisecond, func() {
@@ -1005,10 +1032,10 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 			reopenedIssue, err := execBdJSONIssue(args...)
 			if err != nil {
 				log.Printf("BD COMMAND ERROR: Reopen failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error reopening issue: %v[-]", err))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error reopening issue: %v[-]", formatting.GetErrorColor(), err))
 			} else {
 				log.Printf("BD COMMAND: Issue reopened successfully: %s", reopenedIssue.ID)
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Reopened[-] [white]%s[-]", reopenedIssue.ID))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Reopened [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), reopenedIssue.ID))
 				h.Pages.RemovePage("reopen_issue_dialog")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -1039,7 +1066,7 @@ func (h *DialogHelpers) ShowEditForm() {
 	currentIndex := h.IssueList.GetCurrentItem()
 	issue, ok := (*h.IndexToIssue)[currentIndex]
 	if !ok {
-		h.StatusBar.SetText("[red]No issue selected[-]")
+		h.StatusBar.SetText(fmt.Sprintf("[%s]No issue selected[-]", formatting.GetErrorColor()))
 		return
 	}
 
@@ -1109,23 +1136,23 @@ func (h *DialogHelpers) ShowEditForm() {
 		defer os.Remove(notesFile)
 
 		if err := os.WriteFile(titleFile, []byte(title), 0600); err != nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: %v[-]", formatting.GetErrorColor(), err))
 			return
 		}
 		if err := os.WriteFile(descFile, []byte(description), 0600); err != nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: %v[-]", formatting.GetErrorColor(), err))
 			return
 		}
 		if err := os.WriteFile(designFile, []byte(design), 0600); err != nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: %v[-]", formatting.GetErrorColor(), err))
 			return
 		}
 		if err := os.WriteFile(acceptFile, []byte(acceptance), 0600); err != nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: %v[-]", formatting.GetErrorColor(), err))
 			return
 		}
 		if err := os.WriteFile(notesFile, []byte(notes), 0600); err != nil {
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: %v[-]", formatting.GetErrorColor(), err))
 			return
 		}
 
@@ -1136,17 +1163,17 @@ func (h *DialogHelpers) ShowEditForm() {
 		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Update failed: %v, output: %s", err, string(output))
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error updating issue: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error updating issue: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			// Parse JSON response to verify success
 			result, parseErr := parseBdJSON(output)
 			if parseErr != nil {
 				log.Printf("BD COMMAND ERROR: Failed to parse response: %v", parseErr)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error parsing response: %v[-]", parseErr))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error parsing response: %v[-]", formatting.GetErrorColor(), parseErr))
 			} else if len(result.Issues) > 0 {
 				updatedIssue := result.Issues[0]
 				log.Printf("BD COMMAND: Issue updated successfully: %s", updatedIssue.Title)
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Updated[-] [white]%s[-]", updatedIssue.ID))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Updated [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), updatedIssue.ID))
 				h.Pages.RemovePage("edit_form")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
@@ -1304,7 +1331,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 				}
 				// Add hint
 				priorityNames := []string{"P0 (Critical)", "P1 (High)", "P2 (Normal)", "P3 (Low)", "P4 (Lowest)"}
-				hints = append(hints, fmt.Sprintf("[yellow]Priority:[white] Auto-detected %s", priorityNames[*detectedP]))
+				hints = append(hints, fmt.Sprintf("[%s]Priority:[%s] Auto-detected %s", formatting.GetEmphasisColor(), formatting.GetAccentColor(), priorityNames[*detectedP]))
 			}
 		}
 
@@ -1324,13 +1351,13 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 					}
 				}
 				// Add hint
-				hints = append(hints, fmt.Sprintf("[yellow]Type:[white] Auto-detected %s", *detectedT))
+				hints = append(hints, fmt.Sprintf("[%s]Type:[%s] Auto-detected %s", formatting.GetEmphasisColor(), formatting.GetAccentColor(), *detectedT))
 			}
 		}
 
 		// Update hint view
 		if len(hints) > 0 {
-			detectionHintView.SetText("[gray]" + strings.Join(hints, " | ") + "[-]")
+			detectionHintView.SetText(fmt.Sprintf("[%s]%s[-]", formatting.GetMutedColor(), strings.Join(hints, " | ")))
 		} else {
 			detectionHintView.SetText("")
 		}
@@ -1360,7 +1387,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 	// Add buttons
 	form.AddButton("Create (Ctrl-S)", func() {
 		if title == "" {
-			h.StatusBar.SetText("[red]Error: Title is required[-]")
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Title is required[-]", formatting.GetErrorColor()))
 			return
 		}
 
@@ -1383,10 +1410,10 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		createdIssue, err := execBdJSONIssue(args...)
 		if err != nil {
 			log.Printf("BD COMMAND ERROR: Issue creation failed: %v", err)
-			h.StatusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]Error creating issue: %v[-]", formatting.GetErrorColor(), err))
 		} else {
 			log.Printf("BD COMMAND: Issue created successfully: %s", createdIssue.ID)
-			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Created[-] [white]%s[-]", createdIssue.ID))
+			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Created [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), createdIssue.ID))
 
 			// Close dialog
 			h.Pages.RemovePage("create_issue")
@@ -1414,7 +1441,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		if event.Key() == tcell.KeyCtrlS {
 			// Ctrl-S pressed - submit form
 			if title == "" {
-				h.StatusBar.SetText("[red]Error: Title is required[-]")
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Title is required[-]", formatting.GetErrorColor()))
 				return nil
 			}
 
@@ -1436,10 +1463,10 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 			createdIssue, err := execBdJSONIssue(args...)
 			if err != nil {
 				log.Printf("BD COMMAND ERROR: Issue creation failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]Error creating issue: %v[-]", formatting.GetErrorColor(), err))
 			} else {
 				log.Printf("BD COMMAND: Issue created successfully: %s", createdIssue.ID)
-				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Created[-] [white]%s[-]", createdIssue.ID))
+				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Created [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), createdIssue.ID))
 				h.Pages.RemovePage("create_issue")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
