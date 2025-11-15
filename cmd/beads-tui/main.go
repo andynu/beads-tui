@@ -122,6 +122,9 @@ func main() {
 	// Show closed issues in list view (default: false)
 	var showClosedIssues bool
 
+	// Layout orientation: true = vertical, false = horizontal (default)
+	var verticalLayout bool
+
 	// Track currently displayed issue in detail panel (for clipboard copy)
 	var currentDetailIssue *parser.Issue
 
@@ -156,8 +159,13 @@ func main() {
 			closedText = " [Showing Closed]"
 		}
 
-		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [Mouse: %s] [Focus: %s] [Press ? for help, f for quick filter]",
-			beadsDir, visibleCount, filterText, closedText, viewModeStr, mouseStr, focusStr)
+		layoutStr := "Horizontal"
+		if verticalLayout {
+			layoutStr = "Vertical"
+		}
+
+		return fmt.Sprintf("[yellow]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [%s] [Mouse: %s] [Focus: %s] [Press ? for help, v to toggle layout]",
+			beadsDir, visibleCount, filterText, closedText, viewModeStr, layoutStr, mouseStr, focusStr)
 	}
 
 	// Helper function to populate issue list from state
@@ -341,14 +349,30 @@ func main() {
 		}
 	})
 
-	// Layout
-	flex := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(statusBar, 1, 0, false).
-		AddItem(tview.NewFlex().
-			AddItem(issueList, 0, 1, true).
-			AddItem(detailPanel, 0, 2, false),
-			0, 1, true)
+	// Layout builder function
+	buildLayout := func() *tview.Flex {
+		var contentFlex *tview.Flex
+
+		if verticalLayout {
+			// Vertical: list on top (40%), details on bottom (60%)
+			contentFlex = tview.NewFlex().
+				SetDirection(tview.FlexRow).
+				AddItem(issueList, 0, 40, !detailPanelFocused).
+				AddItem(detailPanel, 0, 60, detailPanelFocused)
+		} else {
+			// Horizontal: list on left (1 part), details on right (2 parts)
+			contentFlex = tview.NewFlex().
+				AddItem(issueList, 0, 1, !detailPanelFocused).
+				AddItem(detailPanel, 0, 2, detailPanelFocused)
+		}
+
+		return tview.NewFlex().
+			SetDirection(tview.FlexRow).
+			AddItem(statusBar, 1, 0, false).
+			AddItem(contentFlex, 0, 1, true)
+	}
+
+	flex := buildLayout()
 
 	// Pages for modal dialogs
 	pages := tview.NewPages().
@@ -734,6 +758,15 @@ func main() {
 				appState.ToggleViewMode()
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
+				return nil
+			case 'v':
+				// Toggle layout orientation (horizontal/vertical)
+				verticalLayout = !verticalLayout
+				newFlex := buildLayout()
+				pages.RemovePage("main")
+				pages.AddPage("main", newFlex, true, true)
+				app.SetRoot(pages, true)
+				statusBar.SetText(getStatusBarText())
 				return nil
 			case 'C':
 				// Toggle showing closed issues
