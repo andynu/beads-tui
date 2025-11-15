@@ -12,7 +12,6 @@ import (
 	"github.com/andy/beads-tui/internal/formatting"
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
-	"github.com/andy/beads-tui/internal/theme"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -1318,16 +1317,14 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 
 	// Create form
 	form := tview.NewForm()
-	form.SetHorizontal(false) // Vertical layout
 	form.SetItemPadding(1) // Add spacing between fields
 
-	// Set field colors to ensure visibility
-	// Use selection background for maximum contrast
-	currentTheme := theme.Current()
-	form.SetFieldBackgroundColor(currentTheme.SelectionBg())
-	form.SetFieldTextColor(currentTheme.SelectionFg())
-	form.SetButtonBackgroundColor(currentTheme.SelectionBg())
-	form.SetButtonTextColor(currentTheme.SelectionFg())
+	// Set field colors to ensure visibility with maximum contrast
+	// Use bright colors that we KNOW are visible
+	form.SetFieldBackgroundColor(tcell.ColorDarkBlue)
+	form.SetFieldTextColor(tcell.ColorWhite)
+	form.SetButtonBackgroundColor(tcell.ColorDarkGreen)
+	form.SetButtonTextColor(tcell.ColorWhite)
 
 	var title, description, priority, issueType string
 	priority = "2" // Default to P2
@@ -1394,13 +1391,12 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		}
 	}
 
-	// Add form fields with wide labels that force wrapping
-	// This makes inputs appear below labels with full width
-	form.AddInputField("Title                                                                                   ", "", 60, nil, func(text string) {
+	// Add form fields - labels will be beside fields for now
+	form.AddInputField("Title", "", 60, nil, func(text string) {
 		title = text
 		updateFromText()
 	})
-	form.AddTextArea("Description                                                                             ", "", 60, 5, 0, func(text string) {
+	form.AddTextArea("Description", "", 60, 5, 0, func(text string) {
 		description = text
 		updateFromText()
 	})
