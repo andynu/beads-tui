@@ -581,6 +581,16 @@ func (h *DialogHelpers) ShowHelpScreen() {
   ?           Show this help screen
   q           Quit
 
+[cyan::b]Themes[-::-]
+  Available themes: default, gruvbox-dark, gruvbox-light, nord,
+  solarized-dark, solarized-light, dracula, tokyo-night, catppuccin-mocha
+
+  Set via command line:
+    beads-tui --theme gruvbox-dark
+
+  Set via environment variable:
+    export BEADS_THEME=gruvbox-dark
+
 [cyan::b]Status Icons[-::-]
   ●           Open/Ready
   ○           Blocked
