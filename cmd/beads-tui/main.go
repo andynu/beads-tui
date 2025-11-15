@@ -34,17 +34,20 @@ func main() {
 	issueID := flag.String("issue", "", "Show only this issue (e.g., tui-abc)")
 	flag.Parse()
 
-	// Set theme if specified
+	// Set default theme to gruvbox-dark
+	_ = theme.SetCurrent("gruvbox-dark")
+
+	// Set theme if specified via CLI
 	if *themeName != "" {
 		if err := theme.SetCurrent(*themeName); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: %v, using default theme\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: %v, using gruvbox-dark theme\n", err)
 		}
 	}
 
-	// Check environment variable for theme
+	// Check environment variable for theme (overrides default, but not CLI)
 	if envTheme := os.Getenv("BEADS_THEME"); envTheme != "" && *themeName == "" {
 		if err := theme.SetCurrent(envTheme); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: %v, using default theme\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: %v, using gruvbox-dark theme\n", err)
 		}
 	}
 
