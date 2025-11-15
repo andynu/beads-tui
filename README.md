@@ -2,6 +2,10 @@
 
 A terminal user interface for the [beads](https://github.com/steveyegge/beads) issue tracker.
 
+> **Note:** This project showcases two things:
+> 1. **[Beads](https://github.com/steveyegge/beads)** - An exceptional local-first issue tracker that uses SQLite + JSONL for storage. If you're tired of heavyweight issue trackers and want something fast, git-friendly, and developer-focused, check out beads!
+> 2. **AI-Assisted Development** - This TUI is developed primarily by guiding [Claude Code](https://code.claude.com), demonstrating how AI pair programming can build complex, maintainable software. The recent refactoring reduced main.go from 2687 to 905 lines (66%) through iterative collaboration.
+
 ## Features
 
 - **Live monitoring** of `.beads/issues.jsonl` with filesystem watching
