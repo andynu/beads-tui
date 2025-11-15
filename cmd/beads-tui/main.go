@@ -148,6 +148,17 @@ func main() {
 	// Track currently displayed issue in detail panel (for clipboard copy)
 	var currentDetailIssue *parser.Issue
 
+	// Helper functions for themed messages
+	successMsg := func(msg string) string {
+		return fmt.Sprintf("[%s]%s[-]", formatting.GetSuccessColor(), msg)
+	}
+	errorMsg := func(msg string) string {
+		return fmt.Sprintf("[%s]%s[-]", formatting.GetErrorColor(), msg)
+	}
+	_ = func(msg string) string { // emphasisMsg - reserved for future use
+		return fmt.Sprintf("[%s]%s[-]", formatting.GetEmphasisColor(), msg)
+	}
+
 	// Helper function to generate status bar text
 	getStatusBarText := func() string {
 		viewModeStr := "List"
@@ -220,7 +231,7 @@ func main() {
 			log.Printf("REFRESH ERROR: Failed to load issues: %v", err)
 			// Show error in status bar
 			app.QueueUpdateDraw(func() {
-				statusBar.SetText(fmt.Sprintf("[red]Error loading issues: %v[-]", err))
+				statusBar.SetText(errorMsg(fmt.Sprintf("Error loading issues: %v", err)))
 			})
 			return
 		}
@@ -733,9 +744,9 @@ func main() {
 					log.Printf("BD COMMAND: Executing status update (S%c): bd update %s --status %s", event.Rune(), issueID, newStatus)
 					updatedIssue, err := execBdJSONIssue("update", issueID, "--status", string(newStatus))
 					if err != nil {
-						statusBar.SetText(fmt.Sprintf("[red]Error updating status: %v[-]", err))
+						statusBar.SetText(errorMsg(fmt.Sprintf("Error updating status: %v", err)))
 					} else {
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to %s[-]", updatedIssue.ID, updatedIssue.Status))
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Set %s to %s", updatedIssue.ID, updatedIssue.Status)))
 						time.AfterFunc(500*time.Millisecond, func() {
 							refreshIssues(issueID)
 						})
@@ -841,7 +852,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", issue.ID)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Copied %s to clipboard[-]", issue.ID))
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
 							app.QueueUpdateDraw(func() {
@@ -861,7 +872,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID with title to clipboard: %s", text)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Copied '%s' to clipboard[-]", text))
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
 							app.QueueUpdateDraw(func() {
@@ -881,7 +892,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[red]Failed to copy: %v[-]", err))
 					} else {
 						log.Printf("CLIPBOARD: Copied branch name to clipboard: %s", branchName)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Copied branch name '%s' to clipboard[-]", branchName))
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
 							app.QueueUpdateDraw(func() {
@@ -925,10 +936,10 @@ func main() {
 					updatedIssue, err := execBdJSONIssue("update", issueID, "--priority", fmt.Sprintf("%d", priority))
 					if err != nil {
 						log.Printf("BD COMMAND ERROR: Priority update failed: %v", err)
-						statusBar.SetText(fmt.Sprintf("[red]Error updating priority: %v[-]", err))
+						statusBar.SetText(errorMsg(fmt.Sprintf("Error updating priority: %v", err)))
 					} else {
 						log.Printf("BD COMMAND: Priority update successful for %s -> P%d", updatedIssue.ID, updatedIssue.Priority)
-						statusBar.SetText(fmt.Sprintf("[green]✓ Set %s to P%d[-]", updatedIssue.ID, updatedIssue.Priority))
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Set %s to P%d", updatedIssue.ID, updatedIssue.Priority)))
 						// Refresh issues after a short delay, preserving selection
 						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
 						time.AfterFunc(500*time.Millisecond, func() {
