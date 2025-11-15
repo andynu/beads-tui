@@ -12,6 +12,7 @@ import (
 	"github.com/andy/beads-tui/internal/formatting"
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
+	"github.com/andy/beads-tui/internal/theme"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -1319,6 +1320,11 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 	form := tview.NewForm()
 	form.SetHorizontal(false) // Vertical layout
 	form.SetItemPadding(1) // Add spacing between fields
+
+	// Set field colors to ensure visibility
+	currentTheme := theme.Current()
+	form.SetFieldBackgroundColor(currentTheme.InputFieldBackground())
+	form.SetFieldTextColor(currentTheme.AppForeground())
 
 	var title, description, priority, issueType string
 	priority = "2" // Default to P2
