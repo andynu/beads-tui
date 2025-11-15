@@ -818,3 +818,106 @@ func TestEpicsAlwaysAtRootLevel(t *testing.T) {
 		t.Errorf("Expected epic's child to be test-child, got %s", epicNode.Children[0].Issue.ID)
 	}
 }
+
+func TestIDBasedParentChildRelationship(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	// Test ID-based nesting (beads naming convention: parent.child)
+	// e.g., tui-y4h is parent of tui-y4h.1, tui-y4h.2, tui-y4h.3
+	issues := []*parser.Issue{
+		{
+			ID:        "tui-y4h",
+			Title:     "Epic: bd upstream PRs",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeEpic,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "tui-y4h.1",
+			Title:     "Add --type flag to bd update",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			// No explicit dependency - should be nested by ID convention
+		},
+		{
+			ID:        "tui-y4h.2",
+			Title:     "Restore type shortcuts",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "tui-y4h.3",
+			Title:     "Add --comments flag",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "tui-other",
+			Title:     "Unrelated issue",
+			Status:    parser.StatusOpen,
+			Priority:  3,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	}
+
+	state.LoadIssues(issues)
+	state.SetViewMode(ViewTree)
+
+	treeNodes := state.GetTreeNodes()
+
+	// Should have 2 root nodes: epic (tui-y4h) and unrelated issue (tui-other)
+	if len(treeNodes) != 2 {
+		t.Errorf("Expected 2 root nodes, got %d", len(treeNodes))
+		for i, node := range treeNodes {
+			t.Logf("  Root %d: %s", i, node.Issue.ID)
+		}
+	}
+
+	// Find the epic node
+	var epicNode *TreeNode
+	for _, node := range treeNodes {
+		if node.Issue.ID == "tui-y4h" {
+			epicNode = node
+			break
+		}
+	}
+
+	if epicNode == nil {
+		t.Fatal("Expected to find tui-y4h epic at root level")
+	}
+
+	// Epic should have 3 children (tui-y4h.1, tui-y4h.2, tui-y4h.3)
+	if len(epicNode.Children) != 3 {
+		t.Errorf("Expected epic to have 3 children, got %d", len(epicNode.Children))
+		for i, child := range epicNode.Children {
+			t.Logf("  Child %d: %s", i, child.Issue.ID)
+		}
+	}
+
+	// Verify children are the expected ones
+	childIDs := make(map[string]bool)
+	for _, child := range epicNode.Children {
+		childIDs[child.Issue.ID] = true
+	}
+
+	expectedChildren := []string{"tui-y4h.1", "tui-y4h.2", "tui-y4h.3"}
+	for _, expectedID := range expectedChildren {
+		if !childIDs[expectedID] {
+			t.Errorf("Expected to find child %s under epic", expectedID)
+		}
+	}
+}

@@ -263,12 +263,29 @@ func (s *State) buildDependencyTree() {
 	childrenMap := make(map[string][]*parser.Issue)       // parent ID -> children
 	blockedByMap := make(map[string][]*parser.Issue)      // blocker ID -> blocked issues
 	hasIncomingDep := make(map[string]bool)               // issues that have parents or blockers
+	idPrefixChildren := make(map[string][]*parser.Issue)  // parent ID -> children by ID prefix (e.g., "epic-1" -> ["epic-1.1", "epic-1.2"])
 
 	// First pass: build relationship maps
 	for _, issue := range s.issues {
 		// Skip closed issues in tree view
 		if issue.Status == parser.StatusClosed {
 			continue
+		}
+
+		// Check for ID-based parent-child relationship (e.g., tui-y4h.1 is child of tui-y4h)
+		// This works for both epics and regular issues
+		for _, potentialParent := range s.issues {
+			if potentialParent.Status == parser.StatusClosed {
+				continue
+			}
+			// Check if this issue's ID starts with parent ID followed by a dot
+			if issue.ID != potentialParent.ID && len(issue.ID) > len(potentialParent.ID) {
+				if issue.ID[:len(potentialParent.ID)] == potentialParent.ID && issue.ID[len(potentialParent.ID)] == '.' {
+					idPrefixChildren[potentialParent.ID] = append(idPrefixChildren[potentialParent.ID], issue)
+					hasIncomingDep[issue.ID] = true
+					break
+				}
+			}
 		}
 
 		for _, dep := range issue.Dependencies {
@@ -289,6 +306,11 @@ func (s *State) buildDependencyTree() {
 				}
 			}
 		}
+	}
+
+	// Merge ID-based children into childrenMap
+	for parentID, children := range idPrefixChildren {
+		childrenMap[parentID] = append(childrenMap[parentID], children...)
 	}
 
 	// Second pass: find root nodes
