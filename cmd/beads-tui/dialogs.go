@@ -1317,6 +1317,8 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 
 	// Create form
 	form := tview.NewForm()
+	form.SetHorizontal(false) // Stack labels above fields
+	form.SetItemPadding(0) // No padding between items
 
 	var title, description, priority, issueType string
 	priority = "2" // Default to P2
@@ -1383,12 +1385,12 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		}
 	}
 
-	// Add form fields with labels on separate lines for more horizontal space
-	form.AddInputField("Title\n", "", 0, nil, func(text string) {
+	// Add form fields
+	form.AddInputField("Title", "", 0, nil, func(text string) {
 		title = text
 		updateFromText()
 	})
-	form.AddTextArea("Description\n", "", 0, 5, 0, func(text string) {
+	form.AddTextArea("Description", "", 0, 5, 0, func(text string) {
 		description = text
 		updateFromText()
 	})
