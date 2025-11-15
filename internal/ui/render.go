@@ -166,8 +166,9 @@ func renderTreeNode(
 	// Format issue line
 	priorityColor := formatting.GetPriorityColor(issue.Priority)
 	statusColor := formatting.GetStatusColor(issue.Status)
-	text := fmt.Sprintf("%s%s[%s]%s[-] [%s]%s[-] [P%d] %s",
-		prefix, branch, statusColor, statusIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
+	typeIcon := formatting.GetTypeIcon(issue.IssueType)
+	text := fmt.Sprintf("%s%s[%s]%s[-] %s [%s]%s[-] [P%d] %s",
+		prefix, branch, statusColor, statusIcon, typeIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {

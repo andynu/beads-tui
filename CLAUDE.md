@@ -14,6 +14,7 @@ This project uses beads for its own issue tracking (dogfooding). The `beads/` su
 
 ```bash
 # Build the TUI
+# IMPORTANT: Always build to the project root, not cmd/beads-tui/beads-tui
 go build -o beads-tui ./cmd/beads-tui
 
 # Run in current directory (finds .beads automatically)
