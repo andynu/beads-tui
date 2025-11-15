@@ -38,26 +38,31 @@ func execBdJSON(args ...string) (*BdCommandResult, error) {
 		args = append(args, "--json")
 	}
 
-	// Build full command: bd <args>
-	fullArgs := append([]string{"bd"}, args...)
-	cmdStr := strings.Join(fullArgs, " ")
-
-	// Execute command
-	output, err := exec.Command("sh", "-c", cmdStr).CombinedOutput()
+	// Execute command directly (not through shell) to avoid quoting issues
+	output, err := exec.Command("bd", args...).CombinedOutput()
 	if err != nil {
 		// Try to parse error from JSON output first
 		var result BdCommandResult
 		if jsonErr := json.Unmarshal(output, &result); jsonErr == nil && result.Error != "" {
-			return nil, fmt.Errorf("bd command failed: %s", result.Error)
+			return nil, fmt.Errorf("bd %s failed: %s", args[0], result.Error)
 		}
 		// Fall back to original error with output
-		return nil, fmt.Errorf("bd command failed: %v, output: %s", err, string(output))
+		outputStr := strings.TrimSpace(string(output))
+		if outputStr == "" {
+			return nil, fmt.Errorf("bd %s command failed: %v", args[0], err)
+		}
+		return nil, fmt.Errorf("bd %s failed: %s", args[0], outputStr)
 	}
 
 	// Parse JSON response
 	result, parseErr := parseBdJSON(output)
 	if parseErr != nil {
-		return nil, fmt.Errorf("failed to parse bd JSON output: %v, output: %s", parseErr, string(output))
+		// Provide helpful error with snippet of output
+		outputPreview := string(output)
+		if len(outputPreview) > 200 {
+			outputPreview = outputPreview[:200] + "..."
+		}
+		return nil, fmt.Errorf("failed to parse JSON from bd %s: %v (output: %s)", args[0], parseErr, outputPreview)
 	}
 
 	return result, nil
@@ -109,7 +114,11 @@ func execBdJSONIssue(args ...string) (*parser.Issue, error) {
 	}
 
 	if len(result.Issues) == 0 {
-		return nil, fmt.Errorf("bd command returned no issues")
+		cmdName := "unknown"
+		if len(args) > 0 {
+			cmdName = args[0]
+		}
+		return nil, fmt.Errorf("bd %s returned no issues (expected an issue in response)", cmdName)
 	}
 
 	return &result.Issues[0], nil
@@ -124,7 +133,11 @@ func execBdJSONComment(args ...string) (*parser.Comment, error) {
 	}
 
 	if len(result.Comments) == 0 {
-		return nil, fmt.Errorf("bd command returned no comments")
+		cmdName := "unknown"
+		if len(args) > 0 {
+			cmdName = args[0]
+		}
+		return nil, fmt.Errorf("bd %s returned no comments (expected a comment in response)", cmdName)
 	}
 
 	return &result.Comments[0], nil
