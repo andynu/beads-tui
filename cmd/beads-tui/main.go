@@ -624,6 +624,27 @@ func main() {
 				return nil
 			}
 			return event
+		case tcell.KeyCtrlB:
+			// Scroll up full page (vim style)
+			_, _, _, height := issueList.GetInnerRect()
+			currentItem := issueList.GetCurrentItem()
+			newItem := currentItem - height
+			if newItem < 0 {
+				newItem = 0
+			}
+			issueList.SetCurrentItem(newItem)
+			return nil
+		case tcell.KeyCtrlF:
+			// Scroll down full page (vim style)
+			_, _, _, height := issueList.GetInnerRect()
+			currentItem := issueList.GetCurrentItem()
+			maxItem := issueList.GetItemCount() - 1
+			newItem := currentItem + height
+			if newItem > maxItem {
+				newItem = maxItem
+			}
+			issueList.SetCurrentItem(newItem)
+			return nil
 		case tcell.KeyRune:
 			// Handle multi-key sequences FIRST before processing individual keys
 			// This prevents conflicts with single-key handlers

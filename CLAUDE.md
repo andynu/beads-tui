@@ -528,6 +528,8 @@ Update `app.SetInputCapture()` in `cmd/beads-tui/main.go`. Current bindings:
 - `r`: Manual refresh
 - `j`: Down (simulates arrow key)
 - `k`: Up (simulates arrow key)
+- `Ctrl-b`: Scroll up full page (vim style)
+- `Ctrl-f`: Scroll down full page (vim style)
 - `t`: Toggle between list and tree view
 - `m`: Toggle mouse mode on/off
 - `a`: Open issue creation dialog (vim-style "add")
