@@ -50,15 +50,14 @@ func (h *DialogHelpers) ShowCommentDialog() {
 			return
 		}
 
-		// Execute bd comment command
-		cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
-		log.Printf("BD COMMAND: Adding comment: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		// Execute bd comment command with --json
+		log.Printf("BD COMMAND: Adding comment: bd comment %s %q", issue.ID, commentText)
+		comment, err := execBdJSONComment("comment", issue.ID, commentText)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Comment failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+			log.Printf("BD COMMAND: Comment added successfully: ID %d", comment.ID)
 			h.StatusBar.SetText("[limegreen]✓ Comment added successfully[-]")
 
 			// Close dialog
@@ -92,14 +91,13 @@ func (h *DialogHelpers) ShowCommentDialog() {
 				return nil
 			}
 
-			cmd := fmt.Sprintf("bd comment %s %q", issue.ID, commentText)
-			log.Printf("BD COMMAND: Adding comment: %s", cmd)
-			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			log.Printf("BD COMMAND: Adding comment: bd comment %s %q", issue.ID, commentText)
+			comment, err := execBdJSONComment("comment", issue.ID, commentText)
 			if err != nil {
-				log.Printf("BD COMMAND ERROR: Comment failed: %v, output: %s", err, string(output))
+				log.Printf("BD COMMAND ERROR: Comment failed: %v", err)
 				h.StatusBar.SetText(fmt.Sprintf("[red]Error adding comment: %v[-]", err))
 			} else {
-				log.Printf("BD COMMAND: Comment added successfully: %s", string(output))
+				log.Printf("BD COMMAND: Comment added successfully: ID %d", comment.ID)
 				h.StatusBar.SetText("[limegreen]✓ Comment added successfully[-]")
 				h.Pages.RemovePage("comment_dialog")
 				h.App.SetFocus(h.IssueList)
@@ -1366,10 +1364,10 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 			return
 		}
 
-		// Build bd create command
-		cmd := fmt.Sprintf("bd create %q -p %s -t %s", title, priority, issueType)
+		// Build bd create command arguments
+		args := []string{"create", title, "-p", priority, "-t", issueType}
 		if description != "" {
-			cmd += fmt.Sprintf(" --description %q", description)
+			args = append(args, "--description", description)
 		}
 
 		// Check if we should add parent relationship
@@ -1377,18 +1375,18 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 			// Check checkbox state
 			formItem := form.GetFormItemByLabel("Add as child of " + currentIssueID)
 			if checkbox, ok := formItem.(*tview.Checkbox); ok && checkbox.IsChecked() {
-				cmd += fmt.Sprintf(" --parent %s", currentIssueID)
+				args = append(args, "--parent", currentIssueID)
 			}
 		}
 
-		log.Printf("BD COMMAND: Creating issue: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		log.Printf("BD COMMAND: Creating issue: bd %s", strings.Join(args, " "))
+		createdIssue, err := execBdJSONIssue(args...)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Issue creation failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Issue creation failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
-			h.StatusBar.SetText("[limegreen]✓ Issue created successfully[-]")
+			log.Printf("BD COMMAND: Issue created successfully: %s", createdIssue.ID)
+			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Created[-] [white]%s[-]", createdIssue.ID))
 
 			// Close dialog
 			h.Pages.RemovePage("create_issue")
@@ -1420,28 +1418,28 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 				return nil
 			}
 
-			// Build bd create command
-			cmd := fmt.Sprintf("bd create %q -p %s -t %s", title, priority, issueType)
+			// Build bd create command arguments
+			args := []string{"create", title, "-p", priority, "-t", issueType}
 			if description != "" {
-				cmd += fmt.Sprintf(" --description %q", description)
+				args = append(args, "--description", description)
 			}
 
 			// Check if we should add parent relationship
 			if currentIssueID != "" {
 				formItem := form.GetFormItemByLabel("Add as child of " + currentIssueID)
 				if checkbox, ok := formItem.(*tview.Checkbox); ok && checkbox.IsChecked() {
-					cmd += fmt.Sprintf(" --parent %s", currentIssueID)
+					args = append(args, "--parent", currentIssueID)
 				}
 			}
 
-			log.Printf("BD COMMAND: Creating issue (Ctrl-S): %s", cmd)
-			output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			log.Printf("BD COMMAND: Creating issue (Ctrl-S): bd %s", strings.Join(args, " "))
+			createdIssue, err := execBdJSONIssue(args...)
 			if err != nil {
-				log.Printf("BD COMMAND ERROR: Issue creation failed: %v, output: %s", err, string(output))
+				log.Printf("BD COMMAND ERROR: Issue creation failed: %v", err)
 				h.StatusBar.SetText(fmt.Sprintf("[red]Error creating issue: %v[-]", err))
 			} else {
-				log.Printf("BD COMMAND: Issue created successfully: %s", string(output))
-				h.StatusBar.SetText("[limegreen]✓ Issue created successfully[-]")
+				log.Printf("BD COMMAND: Issue created successfully: %s", createdIssue.ID)
+				h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Created[-] [white]%s[-]", createdIssue.ID))
 				h.Pages.RemovePage("create_issue")
 				h.App.SetFocus(h.IssueList)
 				time.AfterFunc(500*time.Millisecond, func() {
