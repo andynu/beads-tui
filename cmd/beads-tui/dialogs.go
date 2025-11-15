@@ -581,13 +581,22 @@ func (h *DialogHelpers) ShowHelpScreen() {
   ?           Show this help screen
   q           Quit
 
+[cyan::b]Command Line Options[-::-]
+  --theme <name>      Set color theme
+    beads-tui --theme gruvbox-dark
+
+  --view <mode>       Start in list or tree view
+    beads-tui --view tree
+
+  --issue <id>        Show only a specific issue
+    beads-tui --issue tui-abc
+
+  --debug             Enable debug logging
+
 [cyan::b]Themes[-::-]
   Available themes: default, gruvbox-dark, gruvbox-light, nord,
   solarized-dark, solarized-light, dracula, tokyo-night,
   catppuccin-mocha, catppuccin-latte
-
-  Set via command line:
-    beads-tui --theme gruvbox-dark
 
   Set via environment variable:
     export BEADS_THEME=gruvbox-dark

@@ -30,6 +30,8 @@ func main() {
 	// Parse command line flags
 	debugMode := flag.Bool("debug", false, "Enable debug logging to file")
 	themeName := flag.String("theme", "", "Color theme (default, gruvbox-dark, etc)")
+	viewMode := flag.String("view", "list", "Initial view mode (list or tree)")
+	issueID := flag.String("issue", "", "Show only this issue (e.g., tui-abc)")
 	flag.Parse()
 
 	// Set theme if specified
@@ -102,6 +104,11 @@ func main() {
 
 	// Initialize state
 	appState := state.New()
+
+	// Set initial view mode from command line
+	if *viewMode == "tree" {
+		appState.SetViewMode(state.ViewTree)
+	}
 
 	// Create TUI application
 	app := tview.NewApplication()
@@ -283,6 +290,23 @@ func main() {
 		os.Exit(1)
 	}
 	appState.LoadIssues(issues)
+
+	// Filter by issue ID if specified
+	if *issueID != "" {
+		filtered := make([]*parser.Issue, 0)
+		for _, issue := range issues {
+			if issue.ID == *issueID {
+				filtered = append(filtered, issue)
+				break
+			}
+		}
+		if len(filtered) == 0 {
+			fmt.Fprintf(os.Stderr, "Error: Issue %s not found\n", *issueID)
+			os.Exit(1)
+		}
+		appState.LoadIssues(filtered)
+	}
+
 	statusBar.SetText(getStatusBarText())
 	populateIssueList()
 
