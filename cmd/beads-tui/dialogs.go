@@ -583,7 +583,8 @@ func (h *DialogHelpers) ShowHelpScreen() {
 
 [cyan::b]Themes[-::-]
   Available themes: default, gruvbox-dark, gruvbox-light, nord,
-  solarized-dark, solarized-light, dracula, tokyo-night, catppuccin-mocha
+  solarized-dark, solarized-light, dracula, tokyo-night,
+  catppuccin-mocha, catppuccin-latte
 
   Set via command line:
     beads-tui --theme gruvbox-dark
