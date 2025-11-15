@@ -15,38 +15,42 @@ func FormatIssueDetails(issue *parser.Issue) string {
 	statusColor := GetStatusColor(issue.Status)
 	typeIcon := GetTypeIcon(issue.IssueType)
 
+	mutedColor := GetMutedColor()
+	accentColor := GetAccentColor()
+	emphasisColor := GetEmphasisColor()
+
 	result += fmt.Sprintf("[::b]%s %s[-::-]\n", typeIcon, issue.Title)
-	result += fmt.Sprintf("[gray]ID:[-] %s [blue](click to copy)[-]  ", issue.ID)
+	result += fmt.Sprintf("[%s]ID:[-] %s [%s](click to copy)[-]  ", mutedColor, issue.ID, accentColor)
 	result += fmt.Sprintf("[%s]P%d[-]  ", priorityColor, issue.Priority)
 	result += fmt.Sprintf("[%s]%s[-]\n\n", statusColor, issue.Status)
 
 	// Description
 	if issue.Description != "" {
-		result += "[yellow::b]Description:[-::-]\n"
+		result += fmt.Sprintf("[%s::b]Description:[-::-]\n", emphasisColor)
 		result += issue.Description + "\n\n"
 	}
 
 	// Design notes
 	if issue.Design != "" {
-		result += "[yellow::b]Design:[-::-]\n"
+		result += fmt.Sprintf("[%s::b]Design:[-::-]\n", emphasisColor)
 		result += issue.Design + "\n\n"
 	}
 
 	// Acceptance criteria
 	if issue.AcceptanceCriteria != "" {
-		result += "[yellow::b]Acceptance Criteria:[-::-]\n"
+		result += fmt.Sprintf("[%s::b]Acceptance Criteria:[-::-]\n", emphasisColor)
 		result += issue.AcceptanceCriteria + "\n\n"
 	}
 
 	// Notes
 	if issue.Notes != "" {
-		result += "[yellow::b]Notes:[-::-]\n"
+		result += fmt.Sprintf("[%s::b]Notes:[-::-]\n", emphasisColor)
 		result += issue.Notes + "\n\n"
 	}
 
 	// Dependencies
 	if len(issue.Dependencies) > 0 {
-		result += "[yellow::b]Dependencies:[-::-]\n"
+		result += fmt.Sprintf("[%s::b]Dependencies:[-::-]\n", emphasisColor)
 		for _, dep := range issue.Dependencies {
 			result += fmt.Sprintf("  • [%s]%s[-] %s\n",
 				GetDependencyColor(dep.Type), dep.Type, dep.DependsOnID)
@@ -56,18 +60,18 @@ func FormatIssueDetails(issue *parser.Issue) string {
 
 	// Labels
 	if len(issue.Labels) > 0 {
-		result += "[yellow::b]Labels:[-::-] "
+		result += fmt.Sprintf("[%s::b]Labels:[-::-] ", emphasisColor)
 		for i, label := range issue.Labels {
 			if i > 0 {
 				result += ", "
 			}
-			result += fmt.Sprintf("[cyan]%s[-]", label)
+			result += fmt.Sprintf("[%s]%s[-]", accentColor, label)
 		}
 		result += "\n\n"
 	}
 
 	// Metadata
-	result += "[yellow::b]Metadata:[-::-]\n"
+	result += fmt.Sprintf("[%s::b]Metadata:[-::-]\n", emphasisColor)
 	result += fmt.Sprintf("  Created: %s\n", issue.CreatedAt.Format("2006-01-02 15:04"))
 	result += fmt.Sprintf("  Updated: %s\n", issue.UpdatedAt.Format("2006-01-02 15:04"))
 
@@ -91,9 +95,9 @@ func FormatIssueDetails(issue *parser.Issue) string {
 
 	// Comments
 	if len(issue.Comments) > 0 {
-		result += "\n[yellow::b]Comments:[-::-]\n"
+		result += fmt.Sprintf("\n[%s::b]Comments:[-::-]\n", emphasisColor)
 		for _, comment := range issue.Comments {
-			result += fmt.Sprintf("  [cyan]%s[-] (%s):\n", comment.Author, comment.CreatedAt.Format("2006-01-02 15:04"))
+			result += fmt.Sprintf("  [%s]%s[-] (%s):\n", accentColor, comment.Author, comment.CreatedAt.Format("2006-01-02 15:04"))
 			result += fmt.Sprintf("    %s\n", comment.Text)
 		}
 	}
