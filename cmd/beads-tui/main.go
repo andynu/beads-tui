@@ -18,7 +18,7 @@ import (
 	"github.com/andy/beads-tui/internal/state"
 	"github.com/andy/beads-tui/internal/storage"
 	"github.com/andy/beads-tui/internal/theme"
-	_ "github.com/andy/beads-tui/internal/theme" // Import to register default theme
+	_ "github.com/andy/beads-tui/internal/theme" // Import to register themes
 	"github.com/andy/beads-tui/internal/ui"
 	"github.com/andy/beads-tui/internal/watcher"
 	"github.com/atotto/clipboard"
