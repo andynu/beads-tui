@@ -99,3 +99,11 @@ func (t *NordTheme) BorderNormal() tcell.Color {
 func (t *NordTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0x88c0d0) // nord8
 }
+
+func (t *NordTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0x2e3440) // nord0
+}
+
+func (t *NordTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0xeceff4) // nord6
+}

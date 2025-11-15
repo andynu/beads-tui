@@ -106,6 +106,12 @@ func main() {
 	// Create TUI application
 	app := tview.NewApplication()
 
+	// Apply theme background and foreground colors
+	currentTheme := theme.Current()
+	tview.Styles.PrimitiveBackgroundColor = currentTheme.AppBackground()
+	tview.Styles.PrimaryTextColor = currentTheme.AppForeground()
+	tview.Styles.ContrastBackgroundColor = currentTheme.AppBackground()
+
 	// Status bar
 	statusBar := tview.NewTextView().
 		SetDynamicColors(true)
@@ -113,8 +119,8 @@ func main() {
 	// Issue list
 	issueList := tview.NewList().
 		ShowSecondaryText(false).
-		SetSelectedBackgroundColor(tcell.ColorDarkCyan).
-		SetSelectedTextColor(tcell.ColorBlack)
+		SetSelectedBackgroundColor(currentTheme.SelectionBg()).
+		SetSelectedTextColor(currentTheme.SelectionFg())
 	issueList.SetBorder(true).SetTitle("Issues")
 
 	// Track mapping from list index to issue

@@ -99,3 +99,11 @@ func (t *GruvboxLightTheme) BorderNormal() tcell.Color {
 func (t *GruvboxLightTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0xd79921) // yellow
 }
+
+func (t *GruvboxLightTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0xfbf1c7) // bg0
+}
+
+func (t *GruvboxLightTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0x3c3836) // fg
+}

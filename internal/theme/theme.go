@@ -41,6 +41,10 @@ type Theme interface {
 	SelectionFg() tcell.Color
 	BorderNormal() tcell.Color
 	BorderFocused() tcell.Color
+
+	// Application-wide colors
+	AppBackground() tcell.Color
+	AppForeground() tcell.Color
 }
 
 var (

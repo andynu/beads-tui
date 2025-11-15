@@ -99,3 +99,11 @@ func (t *TokyoNightTheme) BorderNormal() tcell.Color {
 func (t *TokyoNightTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0x7dcfff) // cyan
 }
+
+func (t *TokyoNightTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0x1a1b26) // background
+}
+
+func (t *TokyoNightTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0xa9b1d6) // foreground
+}

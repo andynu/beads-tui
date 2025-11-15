@@ -100,6 +100,14 @@ func (t *CatppuccinMochaTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0xcba6f7) // mauve
 }
 
+func (t *CatppuccinMochaTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0x1e1e2e) // base
+}
+
+func (t *CatppuccinMochaTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0xcdd6f4) // text
+}
+
 // CatppuccinLatteTheme provides the Catppuccin Latte (light) color scheme
 // Based on: https://github.com/catppuccin/catppuccin
 type CatppuccinLatteTheme struct{}
@@ -196,4 +204,12 @@ func (t *CatppuccinLatteTheme) BorderNormal() tcell.Color {
 
 func (t *CatppuccinLatteTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0x8839ef) // mauve
+}
+
+func (t *CatppuccinLatteTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0xeff1f5) // base
+}
+
+func (t *CatppuccinLatteTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0x4c4f69) // text
 }

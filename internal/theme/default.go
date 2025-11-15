@@ -98,3 +98,11 @@ func (t *DefaultTheme) BorderNormal() tcell.Color {
 func (t *DefaultTheme) BorderFocused() tcell.Color {
 	return tcell.ColorYellow
 }
+
+func (t *DefaultTheme) AppBackground() tcell.Color {
+	return tcell.ColorBlack
+}
+
+func (t *DefaultTheme) AppForeground() tcell.Color {
+	return tcell.ColorWhite
+}

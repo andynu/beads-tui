@@ -99,3 +99,11 @@ func (t *DraculaTheme) BorderNormal() tcell.Color {
 func (t *DraculaTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0xff79c6) // pink
 }
+
+func (t *DraculaTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0x282a36) // background
+}
+
+func (t *DraculaTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0xf8f8f2) // foreground
+}

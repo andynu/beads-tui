@@ -100,6 +100,14 @@ func (t *SolarizedDarkTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0x2aa198) // cyan
 }
 
+func (t *SolarizedDarkTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0x002b36) // base03
+}
+
+func (t *SolarizedDarkTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0x839496) // base0
+}
+
 // SolarizedLightTheme provides the Solarized Light color scheme
 type SolarizedLightTheme struct{}
 
@@ -195,4 +203,12 @@ func (t *SolarizedLightTheme) BorderNormal() tcell.Color {
 
 func (t *SolarizedLightTheme) BorderFocused() tcell.Color {
 	return tcell.NewHexColor(0x2aa198) // cyan
+}
+
+func (t *SolarizedLightTheme) AppBackground() tcell.Color {
+	return tcell.NewHexColor(0xfdf6e3) // base3
+}
+
+func (t *SolarizedLightTheme) AppForeground() tcell.Color {
+	return tcell.NewHexColor(0x657b83) // base00
 }
