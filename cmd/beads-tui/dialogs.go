@@ -657,14 +657,13 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 		}
 
 		issueID := issue.ID // Capture before potential refresh
-		cmd := fmt.Sprintf("bd dep add %s %s --type %s", issueID, targetID, depType)
-		log.Printf("BD COMMAND: Adding dependency: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		log.Printf("BD COMMAND: Adding dependency: bd dep add %s %s --type %s", issueID, targetID, depType)
+		updatedIssue, err := execBdJSONIssue("dep", "add", issueID, targetID, "--type", depType)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Dependency add failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Dependency add failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding dependency: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Dependency added successfully")
+			log.Printf("BD COMMAND: Dependency added successfully to %s", updatedIssue.ID)
 			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Added[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depType, targetID))
 			h.Pages.RemovePage("dependency_dialog")
 			h.App.SetFocus(h.IssueList)
@@ -683,14 +682,13 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 			buttonLabel := fmt.Sprintf("Remove %s → %s", depToRemove.Type, depToRemove.DependsOnID)
 			form.AddButton(buttonLabel, func() {
 				issueID := issue.ID
-				cmd := fmt.Sprintf("bd dep remove %s %s --type %s", issueID, depToRemove.DependsOnID, depToRemove.Type)
-				log.Printf("BD COMMAND: Removing dependency: %s", cmd)
-				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				log.Printf("BD COMMAND: Removing dependency: bd dep remove %s %s --type %s", issueID, depToRemove.DependsOnID, depToRemove.Type)
+				updatedIssue, err := execBdJSONIssue("dep", "remove", issueID, depToRemove.DependsOnID, "--type", string(depToRemove.Type))
 				if err != nil {
-					log.Printf("BD COMMAND ERROR: Dependency remove failed: %v, output: %s", err, string(output))
+					log.Printf("BD COMMAND ERROR: Dependency remove failed: %v", err)
 					h.StatusBar.SetText(fmt.Sprintf("[red]Error removing dependency: %v[-]", err))
 				} else {
-					log.Printf("BD COMMAND: Dependency removed successfully")
+					log.Printf("BD COMMAND: Dependency removed successfully from %s", updatedIssue.ID)
 					h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed[-] [yellow]%s[-] [limegreen]dependency to[-] [white]%s[-]", depToRemove.Type, depToRemove.DependsOnID))
 					h.Pages.RemovePage("dependency_dialog")
 					h.App.SetFocus(h.IssueList)
@@ -777,14 +775,13 @@ func (h *DialogHelpers) ShowLabelDialog() {
 		}
 
 		issueID := issue.ID // Capture before potential refresh
-		cmd := fmt.Sprintf("bd label add %s %q", issueID, trimmedLabel)
-		log.Printf("BD COMMAND: Adding label: %s", cmd)
-		output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		log.Printf("BD COMMAND: Adding label: bd label add %s %q", issueID, trimmedLabel)
+		updatedIssue, err := execBdJSONIssue("label", "add", issueID, trimmedLabel)
 		if err != nil {
-			log.Printf("BD COMMAND ERROR: Label add failed: %v, output: %s", err, string(output))
+			log.Printf("BD COMMAND ERROR: Label add failed: %v", err)
 			h.StatusBar.SetText(fmt.Sprintf("[red]Error adding label: %v[-]", err))
 		} else {
-			log.Printf("BD COMMAND: Label added successfully")
+			log.Printf("BD COMMAND: Label added successfully to %s", updatedIssue.ID)
 			h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Added label[-] [yellow]'%s'[-]", trimmedLabel))
 			h.Pages.RemovePage("label_dialog")
 			h.App.SetFocus(h.IssueList)
@@ -803,14 +800,13 @@ func (h *DialogHelpers) ShowLabelDialog() {
 			buttonLabel := fmt.Sprintf("Remove '%s'", labelToRemove)
 			form.AddButton(buttonLabel, func() {
 				issueID := issue.ID
-				cmd := fmt.Sprintf("bd label remove %s %q", issueID, labelToRemove)
-				log.Printf("BD COMMAND: Removing label: %s", cmd)
-				output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+				log.Printf("BD COMMAND: Removing label: bd label remove %s %q", issueID, labelToRemove)
+				updatedIssue, err := execBdJSONIssue("label", "remove", issueID, labelToRemove)
 				if err != nil {
-					log.Printf("BD COMMAND ERROR: Label remove failed: %v, output: %s", err, string(output))
+					log.Printf("BD COMMAND ERROR: Label remove failed: %v", err)
 					h.StatusBar.SetText(fmt.Sprintf("[red]Error removing label: %v[-]", err))
 				} else {
-					log.Printf("BD COMMAND: Label removed successfully")
+					log.Printf("BD COMMAND: Label removed successfully from %s", updatedIssue.ID)
 					h.StatusBar.SetText(fmt.Sprintf("[limegreen]✓ Removed label[-] [yellow]'%s'[-]", labelToRemove))
 					h.Pages.RemovePage("label_dialog")
 					h.App.SetFocus(h.IssueList)
