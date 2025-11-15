@@ -614,6 +614,11 @@ func main() {
 		// Handle detail panel scrolling when focused
 		if detailPanelFocused {
 			switch event.Key() {
+			case tcell.KeyTab:
+				// Return focus to issue list (toggle behavior)
+				detailPanelFocused = false
+				updatePanelFocus()
+				return nil
 			case tcell.KeyEscape:
 				// Hide detail pane and return focus to issue list
 				detailPaneVisible = false
