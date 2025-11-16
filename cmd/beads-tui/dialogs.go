@@ -15,6 +15,7 @@ import (
 	"github.com/andy/beads-tui/internal/theme"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"golang.org/x/term"
 )
 
 // DialogHelpers holds references to UI components needed by dialog functions
@@ -1316,6 +1317,27 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		return nil // No match, keep default
 	}
 
+	// Calculate field width based on terminal size
+	fieldWidth := 45 // default fallback
+
+	// Try to get terminal width from OS
+	if termWidth, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && termWidth > 0 {
+		dialogWidth := (termWidth * 4) / 5
+		fieldWidth = (dialogWidth * 70) / 100
+		// Subtract label width (approximately 15 chars for "Description")
+		fieldWidth -= 15
+		// Clamp to reasonable bounds
+		if fieldWidth < 30 {
+			fieldWidth = 30
+		}
+		if fieldWidth > 80 {
+			fieldWidth = 80
+		}
+		log.Printf("DIALOG: termWidth=%d, dialogWidth=%d, fieldWidth=%d", termWidth, dialogWidth, fieldWidth)
+	} else {
+		log.Printf("DIALOG: Failed to get terminal size, using default fieldWidth=%d, err=%v", fieldWidth, err)
+	}
+
 	// Create form
 	form := tview.NewForm()
 	form.SetItemPadding(1) // Add spacing between fields
@@ -1392,12 +1414,12 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		}
 	}
 
-	// Add form fields with newline in label to force vertical layout
-	form.AddInputField("Title\n", "", 60, nil, func(text string) {
+	// Add form fields with dynamic width
+	form.AddInputField("Title", "", fieldWidth, nil, func(text string) {
 		title = text
 		updateFromText()
 	})
-	form.AddTextArea("Description\n", "", 60, 5, 0, func(text string) {
+	form.AddTextArea("Description", "", fieldWidth, 5, 0, func(text string) {
 		description = text
 		updateFromText()
 	})
@@ -1517,7 +1539,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			AddItem(nil, 0, 1, false).
 			AddItem(formWithHints, 0, 3, true).
-			AddItem(nil, 0, 1, false), 0, 3, true).
+			AddItem(nil, 0, 1, false), 0, 4, true).
 		AddItem(nil, 0, 1, false)
 
 	h.Pages.AddPage("create_issue", modal, true, true)
