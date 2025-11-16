@@ -923,15 +923,13 @@ func main() {
 				// Refresh the issue list to apply new theme colors
 				populateIssueList()
 
-				// Show restart message
+				// Show restart message and schedule app stop
+				go func() {
+					time.Sleep(300 * time.Millisecond)
+					app.Stop()
+				}()
+
 				statusBar.SetText(fmt.Sprintf("[%s]✓ Switched to %s theme - Restarting TUI...[-]", formatting.GetSuccessColor(), nextThemeName))
-				app.Draw()
-
-				// Small delay to show the message
-				time.Sleep(300 * time.Millisecond)
-
-				// Stop the app and restart it to fully apply theme
-				app.Stop()
 				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
