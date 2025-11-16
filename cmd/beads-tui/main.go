@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/andy/beads-tui/internal/app"
+	"github.com/andy/beads-tui/internal/config"
 	"github.com/andy/beads-tui/internal/formatting"
 	"github.com/andy/beads-tui/internal/parser"
 	"github.com/andy/beads-tui/internal/state"
@@ -34,20 +35,35 @@ func main() {
 	issueID := flag.String("issue", "", "Show only this issue (e.g., tui-abc)")
 	flag.Parse()
 
-	// Set default theme to gruvbox-dark
-	_ = theme.SetCurrent("gruvbox-dark")
+	// Load user config (includes theme preference)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to load config: %v, using defaults\n", err)
+		cfg = config.DefaultConfig()
+	}
 
-	// Set theme if specified via CLI
-	if *themeName != "" {
-		if err := theme.SetCurrent(*themeName); err != nil {
+	// Theme priority order: CLI flag > env var > config file > default
+	// Start with theme from config file
+	if cfg.Theme != "" {
+		if err := theme.SetCurrent(cfg.Theme); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: %v, using gruvbox-dark theme\n", err)
+			_ = theme.SetCurrent("gruvbox-dark")
+		}
+	} else {
+		_ = theme.SetCurrent("gruvbox-dark")
+	}
+
+	// Override with environment variable if set
+	if envTheme := os.Getenv("BEADS_THEME"); envTheme != "" && *themeName == "" {
+		if err := theme.SetCurrent(envTheme); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v, keeping current theme\n", err)
 		}
 	}
 
-	// Check environment variable for theme (overrides default, but not CLI)
-	if envTheme := os.Getenv("BEADS_THEME"); envTheme != "" && *themeName == "" {
-		if err := theme.SetCurrent(envTheme); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: %v, using gruvbox-dark theme\n", err)
+	// Override with CLI flag if specified (highest priority)
+	if *themeName != "" {
+		if err := theme.SetCurrent(*themeName); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v, keeping current theme\n", err)
 		}
 	}
 
@@ -874,6 +890,12 @@ func main() {
 				if err := theme.SetCurrent(nextThemeName); err != nil {
 					statusBar.SetText(errorMsg(fmt.Sprintf("Error switching theme: %v", err)))
 					return nil
+				}
+
+				// Save theme preference to config
+				cfg.Theme = nextThemeName
+				if err := config.Save(cfg); err != nil {
+					log.Printf("Warning: failed to save theme preference: %v", err)
 				}
 
 				// Reapply theme to all UI components
