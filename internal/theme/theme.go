@@ -2,6 +2,7 @@ package theme
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/gdamore/tcell/v2"
@@ -91,7 +92,7 @@ func Current() Theme {
 	return currentTheme
 }
 
-// List returns the names of all registered themes
+// List returns the names of all registered themes in sorted order
 func List() []string {
 	registryMutex.RLock()
 	defer registryMutex.RUnlock()
@@ -100,6 +101,7 @@ func List() []string {
 	for name := range registry {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 

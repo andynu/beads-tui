@@ -848,6 +848,57 @@ func main() {
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
 				return nil
+			case 'T':
+				// Cycle to next theme
+				themes := theme.List()
+				if len(themes) == 0 {
+					statusBar.SetText(errorMsg("No themes available"))
+					return nil
+				}
+
+				// Find current theme index
+				currentThemeName := theme.Current().Name()
+				currentIndex := -1
+				for i, name := range themes {
+					if name == currentThemeName {
+						currentIndex = i
+						break
+					}
+				}
+
+				// Get next theme (wrap around)
+				nextIndex := (currentIndex + 1) % len(themes)
+				nextThemeName := themes[nextIndex]
+
+				// Switch to next theme
+				if err := theme.SetCurrent(nextThemeName); err != nil {
+					statusBar.SetText(errorMsg(fmt.Sprintf("Error switching theme: %v", err)))
+					return nil
+				}
+
+				// Reapply theme to all UI components
+				newTheme := theme.Current()
+				tview.Styles.PrimitiveBackgroundColor = newTheme.AppBackground()
+				tview.Styles.PrimaryTextColor = newTheme.AppForeground()
+				tview.Styles.ContrastBackgroundColor = newTheme.InputFieldBackground()
+				tview.Styles.MoreContrastBackgroundColor = newTheme.InputFieldBackground()
+
+				issueList.SetSelectedBackgroundColor(newTheme.SelectionBg())
+				issueList.SetSelectedTextColor(newTheme.SelectionFg())
+
+				// Refresh the issue list to apply new theme colors
+				populateIssueList()
+
+				// Show success message
+				statusBar.SetText(successMsg(fmt.Sprintf("✓ Switched to %s theme", nextThemeName)))
+
+				// Clear message after 2 seconds
+				time.AfterFunc(2*time.Second, func() {
+					app.QueueUpdateDraw(func() {
+						statusBar.SetText(getStatusBarText())
+					})
+				})
+				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
 				verticalLayout = !verticalLayout
