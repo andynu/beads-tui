@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -865,72 +864,6 @@ func main() {
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
 				return nil
-			case 'T':
-				// Cycle to next theme
-				themes := theme.List()
-				if len(themes) == 0 {
-					statusBar.SetText(errorMsg("No themes available"))
-					return nil
-				}
-
-				// Find current theme index
-				currentThemeName := theme.Current().Name()
-				currentIndex := -1
-				for i, name := range themes {
-					if name == currentThemeName {
-						currentIndex = i
-						break
-					}
-				}
-
-				// Get next theme (wrap around)
-				nextIndex := (currentIndex + 1) % len(themes)
-				nextThemeName := themes[nextIndex]
-
-				// Switch to next theme
-				if err := theme.SetCurrent(nextThemeName); err != nil {
-					statusBar.SetText(errorMsg(fmt.Sprintf("Error switching theme: %v", err)))
-					return nil
-				}
-
-				// Save theme preference to config
-				cfg.Theme = nextThemeName
-				if err := config.Save(cfg); err != nil {
-					log.Printf("Warning: failed to save theme preference: %v", err)
-				}
-
-				// Reapply theme to all UI components
-				newTheme := theme.Current()
-
-				// Update global tview styles (affects new components and default colors)
-				tview.Styles.PrimitiveBackgroundColor = newTheme.AppBackground()
-				tview.Styles.PrimaryTextColor = newTheme.AppForeground()
-				tview.Styles.ContrastBackgroundColor = newTheme.InputFieldBackground()
-				tview.Styles.MoreContrastBackgroundColor = newTheme.InputFieldBackground()
-
-				// Update existing components
-				issueList.SetBackgroundColor(newTheme.AppBackground())
-				issueList.SetMainTextColor(newTheme.AppForeground())
-				issueList.SetSelectedBackgroundColor(newTheme.SelectionBg())
-				issueList.SetSelectedTextColor(newTheme.SelectionFg())
-
-				detailPanel.SetBackgroundColor(newTheme.AppBackground())
-				detailPanel.SetTextColor(newTheme.AppForeground())
-
-				statusBar.SetBackgroundColor(newTheme.AppBackground())
-				statusBar.SetTextColor(newTheme.AppForeground())
-
-				// Refresh the issue list to apply new theme colors
-				populateIssueList()
-
-				// Show restart message and schedule app stop
-				go func() {
-					time.Sleep(300 * time.Millisecond)
-					app.Stop()
-				}()
-
-				statusBar.SetText(fmt.Sprintf("[%s]✓ Switched to %s theme - Restarting TUI...[-]", formatting.GetSuccessColor(), nextThemeName))
-				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
 				verticalLayout = !verticalLayout
@@ -1120,33 +1053,6 @@ func main() {
 		panic(err)
 	}
 	log.Printf("APP: Application exited normally")
-
-	// Check if we need to restart (theme was changed)
-	// The config file was already saved with the new theme
-	// If theme in config differs from startup theme, restart
-	newCfg, err := config.Load()
-	if err == nil && cfg.Theme != newCfg.Theme {
-		log.Printf("APP: Theme changed to %s, restarting...", newCfg.Theme)
-		// Re-execute the program with the same arguments
-		execPath, err := os.Executable()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get executable path: %v\n", err)
-			return
-		}
-
-		cmd := exec.Command(execPath, os.Args[1:]...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Start(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to restart: %v\n", err)
-			return
-		}
-
-		// Don't wait for the new process, just exit this one
-		log.Printf("APP: New instance started, exiting")
-	}
 }
 
 // Helper functions have been moved to internal packages:
