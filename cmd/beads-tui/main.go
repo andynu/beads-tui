@@ -922,6 +922,10 @@ func main() {
 				// Refresh the issue list to apply new theme colors
 				populateIssueList()
 
+				// Force a complete redraw of the entire application
+				// This ensures all components, including list item backgrounds, update
+				app.ForceDraw()
+
 				// Show success message
 				statusBar.SetText(successMsg(fmt.Sprintf("✓ Switched to %s theme", nextThemeName)))
 
