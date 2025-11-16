@@ -900,13 +900,24 @@ func main() {
 
 				// Reapply theme to all UI components
 				newTheme := theme.Current()
+
+				// Update global tview styles (affects new components and default colors)
 				tview.Styles.PrimitiveBackgroundColor = newTheme.AppBackground()
 				tview.Styles.PrimaryTextColor = newTheme.AppForeground()
 				tview.Styles.ContrastBackgroundColor = newTheme.InputFieldBackground()
 				tview.Styles.MoreContrastBackgroundColor = newTheme.InputFieldBackground()
 
+				// Update existing components explicitly (they don't auto-pick up style changes)
+				issueList.SetBackgroundColor(newTheme.AppBackground())
+				issueList.SetMainTextColor(newTheme.AppForeground())
 				issueList.SetSelectedBackgroundColor(newTheme.SelectionBg())
 				issueList.SetSelectedTextColor(newTheme.SelectionFg())
+
+				detailPanel.SetBackgroundColor(newTheme.AppBackground())
+				detailPanel.SetTextColor(newTheme.AppForeground())
+
+				statusBar.SetBackgroundColor(newTheme.AppBackground())
+				statusBar.SetTextColor(newTheme.AppForeground())
 
 				// Refresh the issue list to apply new theme colors
 				populateIssueList()
