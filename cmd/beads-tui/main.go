@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -907,7 +908,7 @@ func main() {
 				tview.Styles.ContrastBackgroundColor = newTheme.InputFieldBackground()
 				tview.Styles.MoreContrastBackgroundColor = newTheme.InputFieldBackground()
 
-				// Update existing components explicitly (they don't auto-pick up style changes)
+				// Update existing components
 				issueList.SetBackgroundColor(newTheme.AppBackground())
 				issueList.SetMainTextColor(newTheme.AppForeground())
 				issueList.SetSelectedBackgroundColor(newTheme.SelectionBg())
@@ -922,19 +923,15 @@ func main() {
 				// Refresh the issue list to apply new theme colors
 				populateIssueList()
 
-				// Force a complete redraw of the entire application
-				// This ensures all components, including list item backgrounds, update
-				app.ForceDraw()
+				// Show restart message
+				statusBar.SetText(fmt.Sprintf("[%s]✓ Switched to %s theme - Restarting TUI...[-]", formatting.GetSuccessColor(), nextThemeName))
+				app.Draw()
 
-				// Show success message
-				statusBar.SetText(successMsg(fmt.Sprintf("✓ Switched to %s theme", nextThemeName)))
+				// Small delay to show the message
+				time.Sleep(300 * time.Millisecond)
 
-				// Clear message after 2 seconds
-				time.AfterFunc(2*time.Second, func() {
-					app.QueueUpdateDraw(func() {
-						statusBar.SetText(getStatusBarText())
-					})
-				})
+				// Stop the app and restart it to fully apply theme
+				app.Stop()
 				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
@@ -1125,6 +1122,33 @@ func main() {
 		panic(err)
 	}
 	log.Printf("APP: Application exited normally")
+
+	// Check if we need to restart (theme was changed)
+	// The config file was already saved with the new theme
+	// If theme in config differs from startup theme, restart
+	newCfg, err := config.Load()
+	if err == nil && cfg.Theme != newCfg.Theme {
+		log.Printf("APP: Theme changed to %s, restarting...", newCfg.Theme)
+		// Re-execute the program with the same arguments
+		execPath, err := os.Executable()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get executable path: %v\n", err)
+			return
+		}
+
+		cmd := exec.Command(execPath, os.Args[1:]...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to restart: %v\n", err)
+			return
+		}
+
+		// Don't wait for the new process, just exit this one
+		log.Printf("APP: New instance started, exiting")
+	}
 }
 
 // Helper functions have been moved to internal packages:
