@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/andy/beads-tui/internal/parser"
 )
@@ -38,8 +40,20 @@ func execBdJSON(args ...string) (*BdCommandResult, error) {
 		args = append(args, "--json")
 	}
 
-	// Execute command directly (not through shell) to avoid quoting issues
-	output, err := exec.Command("bd", args...).CombinedOutput()
+	// Create context with timeout to prevent hanging indefinitely
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Execute command with timeout
+	cmd := exec.CommandContext(ctx, "bd", args...)
+	output, err := cmd.CombinedOutput()
+
+	// Check for timeout error specifically
+	if ctx.Err() == context.DeadlineExceeded {
+		cmdStr := "bd " + strings.Join(args, " ")
+		return nil, fmt.Errorf("bd command timed out after 10s: %s", cmdStr)
+	}
+
 	if err != nil {
 		// Try to parse error from JSON output first
 		var result BdCommandResult
