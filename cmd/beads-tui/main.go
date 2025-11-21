@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -238,10 +239,23 @@ func main() {
 		ui.PopulateIssueList(issueList, appState, showClosedIssues, indexToIssue)
 	}
 
+	// Mutex to serialize refresh operations
+	var refreshMutex sync.Mutex
+
 	// Function to load and display issues (for async updates after app starts)
 	// preserveIssueID: if provided, attempt to restore selection to this issue after refresh
 	refreshIssues := func(preserveIssueID ...string) {
-		log.Printf("REFRESH: Starting issue refresh")
+		// Serialize refreshes to prevent concurrent access
+		refreshMutex.Lock()
+		defer refreshMutex.Unlock()
+
+		log.Printf("REFRESH: Starting issue refresh (mutex acquired)")
+
+		// Show "Refreshing..." in status bar
+		app.QueueUpdateDraw(func() {
+			statusBar.SetText("[yellow]⟳ Refreshing...[-]")
+		})
+
 		var targetIssueID string
 		if len(preserveIssueID) > 0 {
 			targetIssueID = preserveIssueID[0]
