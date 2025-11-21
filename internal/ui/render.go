@@ -10,15 +10,20 @@ import (
 )
 
 // PopulateIssueList clears and rebuilds the issue list from state
-// Returns the updated indexToIssue map
+// Updates the provided indexToIssue map in place to avoid stale pointer issues
 func PopulateIssueList(
 	issueList *tview.List,
 	appState *state.State,
 	showClosedIssues bool,
-) map[int]*parser.Issue {
+	indexToIssue map[int]*parser.Issue,
+) {
 	// Clear and rebuild issue list
 	issueList.Clear()
-	indexToIssue := make(map[int]*parser.Issue)
+
+	// Clear the map in place (don't create a new one)
+	for k := range indexToIssue {
+		delete(indexToIssue, k)
+	}
 	currentIndex := 0
 
 	// Check view mode
@@ -97,8 +102,6 @@ func PopulateIssueList(
 			}
 		}
 	}
-
-	return indexToIssue
 }
 
 // formatIssueListItem formats a single issue for the list view

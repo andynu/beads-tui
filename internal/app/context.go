@@ -121,10 +121,11 @@ func (ctx *AppContext) UpdateStatusBar() {
 
 // PopulateIssueList clears and rebuilds the issue list from current state
 func (ctx *AppContext) PopulateIssueList() {
-	ctx.IndexToIssue = ui.PopulateIssueList(
+	ui.PopulateIssueList(
 		ctx.IssueList,
 		ctx.State,
 		ctx.ShowClosedIssues,
+		ctx.IndexToIssue,
 	)
 }
 

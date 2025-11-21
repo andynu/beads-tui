@@ -235,7 +235,7 @@ func main() {
 
 	// Helper function to populate issue list from state
 	populateIssueList := func() {
-		indexToIssue = ui.PopulateIssueList(issueList, appState, showClosedIssues)
+		ui.PopulateIssueList(issueList, appState, showClosedIssues, indexToIssue)
 	}
 
 	// Function to load and display issues (for async updates after app starts)
