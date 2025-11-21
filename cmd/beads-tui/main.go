@@ -239,6 +239,23 @@ func main() {
 		ui.PopulateIssueList(issueList, appState, showClosedIssues, indexToIssue)
 	}
 
+	// safeQueueUpdateDraw wraps app.QueueUpdateDraw with timeout protection
+	// to prevent hanging if the tview event loop becomes unresponsive
+	safeQueueUpdateDraw := func(f func()) {
+		done := make(chan struct{})
+		go func() {
+			app.QueueUpdateDraw(f)
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// Success - update queued normally
+		case <-time.After(10 * time.Second):
+			log.Printf("WARNING: QueueUpdateDraw timed out after 10s")
+		}
+	}
+
 	// Mutex to serialize refresh operations
 	var refreshMutex sync.Mutex
 
@@ -252,7 +269,7 @@ func main() {
 		log.Printf("REFRESH: Starting issue refresh (mutex acquired)")
 
 		// Show "Refreshing..." in status bar
-		app.QueueUpdateDraw(func() {
+		safeQueueUpdateDraw(func() {
 			statusBar.SetText("[yellow]⟳ Refreshing...[-]")
 		})
 
@@ -278,7 +295,7 @@ func main() {
 		if err != nil {
 			log.Printf("REFRESH ERROR: Failed to load issues: %v", err)
 			// Show error in status bar
-			app.QueueUpdateDraw(func() {
+			safeQueueUpdateDraw(func() {
 				statusBar.SetText(errorMsg(fmt.Sprintf("Error loading issues: %v", err)))
 			})
 			return
@@ -291,7 +308,7 @@ func main() {
 
 		// Update UI on main thread
 		log.Printf("REFRESH: Queueing UI update")
-		app.QueueUpdateDraw(func() {
+		safeQueueUpdateDraw(func() {
 			log.Printf("REFRESH: UI update executing")
 			// Update status bar
 			statusBar.SetText(getStatusBarText())
@@ -399,7 +416,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID))
 					// Clear message after 2 seconds
 					time.AfterFunc(2*time.Second, func() {
-						app.QueueUpdateDraw(func() {
+						safeQueueUpdateDraw(func() {
 							statusBar.SetText(getStatusBarText())
 						})
 					})
@@ -940,7 +957,7 @@ func main() {
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
-							app.QueueUpdateDraw(func() {
+							safeQueueUpdateDraw(func() {
 								statusBar.SetText(getStatusBarText())
 							})
 						})
@@ -960,7 +977,7 @@ func main() {
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
-							app.QueueUpdateDraw(func() {
+							safeQueueUpdateDraw(func() {
 								statusBar.SetText(getStatusBarText())
 							})
 						})
@@ -980,7 +997,7 @@ func main() {
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)))
 						// Clear message after 2 seconds
 						time.AfterFunc(2*time.Second, func() {
-							app.QueueUpdateDraw(func() {
+							safeQueueUpdateDraw(func() {
 								statusBar.SetText(getStatusBarText())
 							})
 						})
@@ -1040,7 +1057,7 @@ func main() {
 				statusBar.SetText(fmt.Sprintf("[%s]Status shortcut: o/i/b/c[-]", formatting.GetEmphasisColor()))
 				// Reset after 2 seconds if no second key
 				time.AfterFunc(2*time.Second, func() {
-					app.QueueUpdateDraw(func() {
+					safeQueueUpdateDraw(func() {
 						if lastKeyWasS {
 							lastKeyWasS = false
 							statusBar.SetText(getStatusBarText())
