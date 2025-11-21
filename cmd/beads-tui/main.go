@@ -774,6 +774,19 @@ func main() {
 			issueList.SetCurrentItem(newItem)
 			return nil
 		case tcell.KeyRune:
+			// Handle space bar for page down with wrapping
+			if event.Rune() == ' ' {
+				_, _, _, height := issueList.GetInnerRect()
+				currentItem := issueList.GetCurrentItem()
+				maxItem := issueList.GetItemCount() - 1
+				newItem := currentItem + height
+				if newItem > maxItem {
+					// Wrap to top
+					newItem = 0
+				}
+				issueList.SetCurrentItem(newItem)
+				return nil
+			}
 			// Handle multi-key sequences FIRST before processing individual keys
 			// This prevents conflicts with single-key handlers
 
@@ -1048,7 +1061,12 @@ func main() {
 	// Enable mouse by default (can be toggled with 'm' key)
 	app.EnableMouse(mouseEnabled)
 	log.Printf("APP: Starting tview application main loop")
-	if err := app.SetRoot(pages, true).Run(); err != nil {
+
+	// Set root and ensure issue list has focus initially
+	app.SetRoot(pages, true)
+	app.SetFocus(issueList)
+
+	if err := app.Run(); err != nil {
 		log.Printf("APP ERROR: Application crashed: %v", err)
 		panic(err)
 	}

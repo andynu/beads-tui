@@ -35,11 +35,26 @@ func PopulateIssueList(
 		}
 	} else {
 		// List view (original behavior)
+		// Add in-progress issues first (most important)
+		inProgressIssues := appState.GetInProgressIssues()
+		if len(inProgressIssues) > 0 {
+			inProgressColor := formatting.GetStatusColor(parser.StatusInProgress)
+			issueList.AddItem(fmt.Sprintf("[%s::b]⬤ IN PROGRESS (%d)[-::-]", inProgressColor, len(inProgressIssues)), "", 0, nil)
+			currentIndex++
+
+			for _, issue := range inProgressIssues {
+				text := formatIssueListItem(issue, "◆")
+				issueList.AddItem(text, "", 0, nil)
+				indexToIssue[currentIndex] = issue
+				currentIndex++
+			}
+		}
+
 		// Add ready issues
 		readyIssues := appState.GetReadyIssues()
 		if len(readyIssues) > 0 {
 			openColor := formatting.GetStatusColor(parser.StatusOpen)
-			issueList.AddItem(fmt.Sprintf("[%s::b]⬤ READY (%d)[-::-]", openColor, len(readyIssues)), "", 0, nil)
+			issueList.AddItem(fmt.Sprintf("\n[%s::b]⬤ READY (%d)[-::-]", openColor, len(readyIssues)), "", 0, nil)
 			currentIndex++
 
 			for _, issue := range readyIssues {
@@ -59,21 +74,6 @@ func PopulateIssueList(
 
 			for _, issue := range blockedIssues {
 				text := formatIssueListItem(issue, "○")
-				issueList.AddItem(text, "", 0, nil)
-				indexToIssue[currentIndex] = issue
-				currentIndex++
-			}
-		}
-
-		// Add in-progress issues
-		inProgressIssues := appState.GetInProgressIssues()
-		if len(inProgressIssues) > 0 {
-			inProgressColor := formatting.GetStatusColor(parser.StatusInProgress)
-			issueList.AddItem(fmt.Sprintf("\n[%s::b]⬤ IN PROGRESS (%d)[-::-]", inProgressColor, len(inProgressIssues)), "", 0, nil)
-			currentIndex++
-
-			for _, issue := range inProgressIssues {
-				text := formatIssueListItem(issue, "◆")
 				issueList.AddItem(text, "", 0, nil)
 				indexToIssue[currentIndex] = issue
 				currentIndex++
