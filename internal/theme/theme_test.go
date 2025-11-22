@@ -7,7 +7,10 @@ import (
 )
 
 func TestDefaultTheme(t *testing.T) {
-	dt := &DefaultTheme{}
+	dt := Get("default")
+	if dt == nil {
+		t.Fatal("default theme not found")
+	}
 
 	// Test name
 	if dt.Name() != "default" {
@@ -133,30 +136,26 @@ func TestSetCurrent(t *testing.T) {
 }
 
 func TestRegisterTheme(t *testing.T) {
-	// Create a custom theme
-	type TestTheme struct {
-		DefaultTheme
+	// Load a TOML theme and verify it can be registered
+	theme, err := LoadTOMLTheme("default")
+	if err != nil {
+		t.Fatalf("Failed to load theme for registration test: %v", err)
 	}
 
-	testTheme := &TestTheme{}
+	// Register should work (it's already registered via init, but we can re-register)
+	Register(theme)
 
-	// Override Name
-	testTheme.DefaultTheme = DefaultTheme{}
-
-	// Register should work
-	Register(testTheme)
-
-	// Should now be in the list
+	// Should be in the list
 	themes := List()
 	found := false
 	for _, name := range themes {
-		if name == "default" { // TestTheme uses DefaultTheme's Name() which returns "default"
+		if name == "default" {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Error("Expected to find registered test theme")
+		t.Error("Expected to find registered theme")
 	}
 }

@@ -1,0 +1,40 @@
+[theme]
+name = "tokyo-night"
+description = "A clean, dark theme inspired by Tokyo's night lights"
+
+[priority]
+p0 = "#f7768e"  # red
+p1 = "#ff9e64"  # orange
+p2 = "#7aa2f7"  # blue
+p3 = "#565f89"  # comment
+p4 = "#414868"  # darker comment
+
+[status]
+open = "#9ece6a"        # green
+in_progress = "#7aa2f7" # blue
+blocked = "#e0af68"     # yellow
+closed = "#565f89"      # comment
+
+[dependency]
+blocks = "#f7768e"          # red
+related = "#7aa2f7"         # blue
+parent_child = "#9ece6a"    # green
+discovered_from = "#e0af68" # yellow
+
+[ui]
+success = "#9ece6a"   # green
+error = "#f7768e"     # red
+warning = "#e0af68"   # yellow
+info = "#7dcfff"      # cyan
+muted = "#565f89"     # comment
+emphasis = "#bb9af7"  # purple
+accent = "#7dcfff"    # cyan
+
+[component]
+selection_bg = "#283457"       # selection
+selection_fg = "#a9b1d6"       # foreground
+border_normal = "#565f89"      # comment
+border_focused = "#7dcfff"     # cyan
+app_background = "#1a1b26"     # background
+app_foreground = "#a9b1d6"     # foreground
+input_field_background = "#24283b"  # background highlight

@@ -1,0 +1,40 @@
+[theme]
+name = "nord"
+description = "Arctic, north-bluish color palette"
+
+[priority]
+p0 = "#bf616a"  # nord11 (red)
+p1 = "#d08770"  # nord12 (orange)
+p2 = "#81a1c1"  # nord9 (blue)
+p3 = "#4c566a"  # nord3 (dark gray)
+p4 = "#3b4252"  # nord1 (darker gray)
+
+[status]
+open = "#a3be8c"        # nord14 (green)
+in_progress = "#88c0d0" # nord8 (cyan)
+blocked = "#ebcb8b"     # nord13 (yellow)
+closed = "#4c566a"      # nord3 (gray)
+
+[dependency]
+blocks = "#bf616a"          # nord11 (red)
+related = "#81a1c1"         # nord9 (blue)
+parent_child = "#a3be8c"    # nord14 (green)
+discovered_from = "#ebcb8b" # nord13 (yellow)
+
+[ui]
+success = "#a3be8c"   # nord14 (green)
+error = "#bf616a"     # nord11 (red)
+warning = "#ebcb8b"   # nord13 (yellow)
+info = "#81a1c1"      # nord9 (blue)
+muted = "#4c566a"     # nord3 (gray)
+emphasis = "#88c0d0"  # nord8 (cyan)
+accent = "#5e81ac"    # nord10 (frost blue)
+
+[component]
+selection_bg = "#3b4252"       # nord1
+selection_fg = "#eceff4"       # nord6
+border_normal = "#4c566a"      # nord3
+border_focused = "#88c0d0"     # nord8
+app_background = "#2e3440"     # nord0
+app_foreground = "#eceff4"     # nord6
+input_field_background = "#3b4252"  # nord1 (polar night lighter)

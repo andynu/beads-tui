@@ -1,0 +1,40 @@
+[theme]
+name = "catppuccin-latte"
+description = "Soothing pastel theme for the high-spirited (light variant)"
+
+[priority]
+p0 = "#d20f39"  # red
+p1 = "#fe640b"  # peach (orange)
+p2 = "#1e66f5"  # blue
+p3 = "#9ca0b0"  # overlay1
+p4 = "#acb0be"  # overlay0
+
+[status]
+open = "#40a02b"        # green
+in_progress = "#1e66f5" # blue
+blocked = "#df8e1d"     # yellow
+closed = "#9ca0b0"      # overlay1
+
+[dependency]
+blocks = "#d20f39"          # red
+related = "#1e66f5"         # blue
+parent_child = "#40a02b"    # green
+discovered_from = "#df8e1d" # yellow
+
+[ui]
+success = "#40a02b"   # green
+error = "#d20f39"     # red
+warning = "#df8e1d"   # yellow
+info = "#179299"      # teal
+muted = "#9ca0b0"     # overlay1
+emphasis = "#8839ef"  # mauve (purple)
+accent = "#179299"    # teal
+
+[component]
+selection_bg = "#e6e9ef"       # surface0
+selection_fg = "#4c4f69"       # text
+border_normal = "#9ca0b0"      # overlay1
+border_focused = "#8839ef"     # mauve
+app_background = "#eff1f5"     # base
+app_foreground = "#4c4f69"     # text
+input_field_background = "#e6e9ef"  # surface0

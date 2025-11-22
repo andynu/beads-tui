@@ -1,0 +1,40 @@
+[theme]
+name = "dracula"
+description = "Dark theme with a purple accent"
+
+[priority]
+p0 = "#ff5555"  # red
+p1 = "#ffb86c"  # orange
+p2 = "#8be9fd"  # cyan
+p3 = "#6272a4"  # comment (purple-gray)
+p4 = "#44475a"  # current line (darker)
+
+[status]
+open = "#50fa7b"        # green
+in_progress = "#bd93f9" # purple
+blocked = "#f1fa8c"     # yellow
+closed = "#6272a4"      # comment
+
+[dependency]
+blocks = "#ff5555"          # red
+related = "#8be9fd"         # cyan
+parent_child = "#50fa7b"    # green
+discovered_from = "#f1fa8c" # yellow
+
+[ui]
+success = "#50fa7b"   # green
+error = "#ff5555"     # red
+warning = "#f1fa8c"   # yellow
+info = "#8be9fd"      # cyan
+muted = "#6272a4"     # comment
+emphasis = "#ff79c6"  # pink
+accent = "#bd93f9"    # purple
+
+[component]
+selection_bg = "#44475a"       # current line
+selection_fg = "#f8f8f2"       # foreground
+border_normal = "#6272a4"      # comment
+border_focused = "#ff79c6"     # pink
+app_background = "#282a36"     # background
+app_foreground = "#f8f8f2"     # foreground
+input_field_background = "#44475a"  # current line

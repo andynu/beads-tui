@@ -3,7 +3,10 @@ package theme
 import "testing"
 
 func TestGruvboxDarkTheme(t *testing.T) {
-	theme := &GruvboxDarkTheme{}
+	theme := Get("gruvbox-dark")
+	if theme == nil {
+		t.Fatal("gruvbox-dark theme not found")
+	}
 
 	if theme.Name() != "gruvbox-dark" {
 		t.Errorf("Expected name 'gruvbox-dark', got %s", theme.Name())
@@ -37,7 +40,10 @@ func TestGruvboxDarkTheme(t *testing.T) {
 }
 
 func TestGruvboxLightTheme(t *testing.T) {
-	theme := &GruvboxLightTheme{}
+	theme := Get("gruvbox-light")
+	if theme == nil {
+		t.Fatal("gruvbox-light theme not found")
+	}
 
 	if theme.Name() != "gruvbox-light" {
 		t.Errorf("Expected name 'gruvbox-light', got %s", theme.Name())

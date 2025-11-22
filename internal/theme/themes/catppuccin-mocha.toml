@@ -1,0 +1,40 @@
+[theme]
+name = "catppuccin-mocha"
+description = "Soothing pastel theme for the high-spirited (dark variant)"
+
+[priority]
+p0 = "#f38ba8"  # red
+p1 = "#fab387"  # peach (orange)
+p2 = "#89b4fa"  # blue
+p3 = "#6c7086"  # overlay1
+p4 = "#585b70"  # overlay0
+
+[status]
+open = "#a6e3a1"        # green
+in_progress = "#89b4fa" # blue
+blocked = "#f9e2af"     # yellow
+closed = "#6c7086"      # overlay1
+
+[dependency]
+blocks = "#f38ba8"          # red
+related = "#89b4fa"         # blue
+parent_child = "#a6e3a1"    # green
+discovered_from = "#f9e2af" # yellow
+
+[ui]
+success = "#a6e3a1"   # green
+error = "#f38ba8"     # red
+warning = "#f9e2af"   # yellow
+info = "#94e2d5"      # teal
+muted = "#6c7086"     # overlay1
+emphasis = "#cba6f7"  # mauve (purple)
+accent = "#94e2d5"    # teal
+
+[component]
+selection_bg = "#313244"       # surface0
+selection_fg = "#cdd6f4"       # text
+border_normal = "#6c7086"      # overlay1
+border_focused = "#cba6f7"     # mauve
+app_background = "#1e1e2e"     # base
+app_foreground = "#cdd6f4"     # text
+input_field_background = "#313244"  # surface0

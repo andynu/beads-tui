@@ -1,0 +1,40 @@
+[theme]
+name = "solarized-light"
+description = "Precision colors for machines and people (light variant)"
+
+[priority]
+p0 = "#dc322f"  # red
+p1 = "#cb4b16"  # orange
+p2 = "#268bd2"  # blue
+p3 = "#93a1a1"  # base1
+p4 = "#839496"  # base0
+
+[status]
+open = "#859900"        # green
+in_progress = "#268bd2" # blue
+blocked = "#b58900"     # yellow
+closed = "#93a1a1"      # base1
+
+[dependency]
+blocks = "#dc322f"          # red
+related = "#268bd2"         # blue
+parent_child = "#859900"    # green
+discovered_from = "#b58900" # yellow
+
+[ui]
+success = "#859900"   # green
+error = "#dc322f"     # red
+warning = "#b58900"   # yellow
+info = "#2aa198"      # cyan
+muted = "#93a1a1"     # base1
+emphasis = "#b58900"  # yellow
+accent = "#2aa198"    # cyan
+
+[component]
+selection_bg = "#eee8d5"       # base2
+selection_fg = "#586e75"       # base01
+border_normal = "#93a1a1"      # base1
+border_focused = "#2aa198"     # cyan
+app_background = "#fdf6e3"     # base3
+app_foreground = "#657b83"     # base00
+input_field_background = "#eee8d5"  # base2

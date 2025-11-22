@@ -1,0 +1,40 @@
+[theme]
+name = "gruvbox-dark"
+description = "Retro groove color scheme (dark variant)"
+
+[priority]
+p0 = "#fb4934"  # bright red
+p1 = "#fe8019"  # bright orange
+p2 = "#83a598"  # bright blue
+p3 = "#928374"  # gray
+p4 = "#665c54"  # dark gray
+
+[status]
+open = "#b8bb26"        # bright green
+in_progress = "#83a598" # bright blue
+blocked = "#fabd2f"     # bright yellow
+closed = "#928374"      # gray
+
+[dependency]
+blocks = "#fb4934"          # bright red
+related = "#83a598"         # bright blue
+parent_child = "#b8bb26"    # bright green
+discovered_from = "#fabd2f" # bright yellow
+
+[ui]
+success = "#b8bb26"   # bright green
+error = "#fb4934"     # bright red
+warning = "#fabd2f"   # bright yellow
+info = "#83a598"      # bright blue
+muted = "#928374"     # gray
+emphasis = "#fabd2f"  # bright yellow
+accent = "#8ec07c"    # bright aqua
+
+[component]
+selection_bg = "#504945"       # dark2
+selection_fg = "#ebdbb2"       # fg
+border_normal = "#928374"      # gray
+border_focused = "#fabd2f"     # bright yellow
+app_background = "#282828"     # bg0
+app_foreground = "#ebdbb2"     # fg
+input_field_background = "#3c3836"  # bg1

@@ -1,0 +1,40 @@
+[theme]
+name = "high-contrast"
+description = "Maximum contrast for accessibility - pure black/white with bold colors"
+
+[priority]
+p0 = "#FF0000"  # pure red (critical)
+p1 = "#FF8800"  # bright orange (high)
+p2 = "#00DDFF"  # cyan (normal)
+p3 = "#AAAAAA"  # light gray (low)
+p4 = "#666666"  # dark gray (lowest)
+
+[status]
+open = "#00FF00"        # bright green
+in_progress = "#00DDFF" # bright cyan
+blocked = "#FFFF00"     # bright yellow
+closed = "#888888"      # medium gray
+
+[dependency]
+blocks = "#FF0000"          # bright red
+related = "#00DDFF"         # bright cyan
+parent_child = "#00FF00"    # bright green
+discovered_from = "#FFFF00" # bright yellow
+
+[ui]
+success = "#00FF00"   # bright green
+error = "#FF0000"     # bright red
+warning = "#FFFF00"   # bright yellow
+info = "#00DDFF"      # bright cyan
+muted = "#AAAAAA"     # light gray
+emphasis = "#FFFF00"  # bright yellow
+accent = "#FF00FF"    # bright magenta
+
+[component]
+selection_bg = "#333333"       # dark gray
+selection_fg = "#FFFFFF"       # pure white
+border_normal = "#888888"      # medium gray
+border_focused = "#FFFF00"     # bright yellow
+app_background = "#000000"     # pure black
+app_foreground = "#FFFFFF"     # pure white
+input_field_background = "#222222"  # very dark gray

@@ -3,7 +3,10 @@ package theme
 import "testing"
 
 func TestHighContrastTheme(t *testing.T) {
-	theme := &HighContrastTheme{}
+	theme := Get("high-contrast")
+	if theme == nil {
+		t.Fatal("high-contrast theme not found")
+	}
 
 	if theme.Name() != "high-contrast" {
 		t.Errorf("Expected name 'high-contrast', got %s", theme.Name())
@@ -51,7 +54,10 @@ func TestHighContrastTheme(t *testing.T) {
 }
 
 func TestColorblindTheme(t *testing.T) {
-	theme := &ColorblindTheme{}
+	theme := Get("colorblind")
+	if theme == nil {
+		t.Fatal("colorblind theme not found")
+	}
 
 	if theme.Name() != "colorblind" {
 		t.Errorf("Expected name 'colorblind', got %s", theme.Name())
@@ -159,7 +165,10 @@ func TestSwitchToAccessibilityThemes(t *testing.T) {
 // TestColorblindSafety verifies that the colorblind theme avoids
 // problematic red-green combinations
 func TestColorblindSafety(t *testing.T) {
-	theme := &ColorblindTheme{}
+	theme := Get("colorblind")
+	if theme == nil {
+		t.Fatal("colorblind theme not found")
+	}
 
 	// Verify that success/error use different hues (blue/orange instead of green/red)
 	success := theme.Success()
@@ -196,7 +205,10 @@ func TestColorblindSafety(t *testing.T) {
 // TestHighContrastColors verifies that high contrast theme uses
 // sufficiently bright/saturated colors
 func TestHighContrastColors(t *testing.T) {
-	theme := &HighContrastTheme{}
+	theme := Get("high-contrast")
+	if theme == nil {
+		t.Fatal("high-contrast theme not found")
+	}
 
 	// Verify background is pure black
 	bg := theme.AppBackground()

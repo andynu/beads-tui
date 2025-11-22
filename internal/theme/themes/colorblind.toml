@@ -1,0 +1,40 @@
+[theme]
+name = "colorblind"
+description = "Optimized for deuteranopia (red-green colorblindness)"
+
+[priority]
+p0 = "#D55E00"  # vermillion orange (critical)
+p1 = "#E69F00"  # orange (high)
+p2 = "#0072B2"  # blue (normal)
+p3 = "#999999"  # gray (low)
+p4 = "#666666"  # dark gray (lowest)
+
+[status]
+open = "#56B4E9"        # sky blue (replaces green)
+in_progress = "#0072B2" # blue
+blocked = "#E69F00"     # orange (replaces yellow)
+closed = "#999999"      # gray
+
+[dependency]
+blocks = "#D55E00"          # vermillion orange
+related = "#56B4E9"         # sky blue
+parent_child = "#009E73"    # bluish green (safe for deuteranopia)
+discovered_from = "#CC79A7" # reddish purple
+
+[ui]
+success = "#56B4E9"   # sky blue (instead of green)
+error = "#D55E00"     # vermillion orange (instead of red)
+warning = "#E69F00"   # orange
+info = "#0072B2"      # blue
+muted = "#999999"     # gray
+emphasis = "#F0E442"  # yellow (high luminance, safe)
+accent = "#CC79A7"    # reddish purple
+
+[component]
+selection_bg = "#2B3E50"       # dark blue-gray
+selection_fg = "#ECF0F1"       # light gray (almost white)
+border_normal = "#7F8C8D"      # medium gray
+border_focused = "#F0E442"     # yellow
+app_background = "#1C2833"     # dark blue-gray
+app_foreground = "#ECF0F1"     # light gray
+input_field_background = "#2B3E50"  # slightly lighter dark blue-gray

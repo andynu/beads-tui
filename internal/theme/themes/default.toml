@@ -1,0 +1,40 @@
+[theme]
+name = "default"
+description = "Original beads-tui color scheme with named X11 colors"
+
+[priority]
+p0 = "red"           # Critical - bright red
+p1 = "orangered"     # High - orange-red for urgency
+p2 = "lightskyblue"  # Normal - calm blue
+p3 = "darkgray"      # Low - subdued gray
+p4 = "gray"          # Lowest - very subdued
+
+[status]
+open = "limegreen"     # Bright green for ready work
+in_progress = "deepskyblue"  # Vibrant blue for active work
+blocked = "gold"       # Gold/yellow for warning
+closed = "darkgray"    # Muted gray
+
+[dependency]
+blocks = "red"
+related = "blue"
+parent_child = "green"
+discovered_from = "yellow"
+
+[ui]
+success = "limegreen"
+error = "red"
+warning = "gold"
+info = "cyan"
+muted = "gray"
+emphasis = "yellow"
+accent = "cyan"
+
+[component]
+selection_bg = "#0000FF"      # blue
+selection_fg = "#FFFFFF"      # white
+border_normal = "#FFFFFF"     # white
+border_focused = "#FFFF00"    # yellow
+app_background = "#000000"    # black
+app_foreground = "#FFFFFF"    # white
+input_field_background = "#1a1a1a"  # slightly lighter than black
