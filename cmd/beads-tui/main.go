@@ -528,33 +528,23 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
+	// Use sync.Once to ensure shutdown happens exactly once
+	var shutdownOnce sync.Once
+
 	// Run signal handler in goroutine
 	go func() {
-		sig := <-sigChan
-		log.Printf("SIGNAL: Received signal %v, initiating graceful shutdown", sig)
+		for sig := range sigChan {
+			shutdownOnce.Do(func() {
+				log.Printf("SIGNAL: Received signal %v, initiating graceful shutdown", sig)
 
-		// Stop the TUI application
-		app.Stop()
+				// Stop the TUI application
+				app.Stop()
 
-		// Give deferred cleanup functions time to execute
-		// If they don't complete within 5 seconds, force exit
-		cleanupDone := make(chan struct{})
-		go func() {
-			// This will be reached after app.Stop() returns and we're back in the main goroutine
-			time.Sleep(100 * time.Millisecond) // Small delay to allow main() to return
-			close(cleanupDone)
-		}()
+				log.Printf("SIGNAL: Graceful shutdown complete")
+			})
 
-		select {
-		case <-cleanupDone:
-			log.Printf("SIGNAL: Graceful shutdown complete")
-		case <-time.After(5 * time.Second):
-			log.Printf("SIGNAL: Shutdown timeout, forcing exit")
-			if logFile != nil {
-				logFile.Sync()
-				logFile.Close()
-			}
-			os.Exit(1)
+			// Log duplicate shutdown attempts
+			log.Printf("SIGNAL: Received additional signal %v, shutdown already in progress", sig)
 		}
 	}()
 
