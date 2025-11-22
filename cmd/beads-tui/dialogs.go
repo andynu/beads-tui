@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/andy/beads-tui/internal/formatting"
 	"github.com/andy/beads-tui/internal/parser"
@@ -20,13 +19,14 @@ import (
 
 // DialogHelpers holds references to UI components needed by dialog functions
 type DialogHelpers struct {
-	App           *tview.Application
-	Pages         *tview.Pages
-	IssueList     *tview.List
-	IndexToIssue  *map[int]*parser.Issue
-	StatusBar     *tview.TextView
-	AppState      *state.State
-	RefreshIssues func(...string)
+	App             *tview.Application
+	Pages           *tview.Pages
+	IssueList       *tview.List
+	IndexToIssue    *map[int]*parser.Issue
+	StatusBar       *tview.TextView
+	AppState        *state.State
+	RefreshIssues   func(...string)
+	ScheduleRefresh func(string)
 }
 
 // ShowCommentDialog displays a dialog to add a comment to the current issue
@@ -69,9 +69,7 @@ func (h *DialogHelpers) ShowCommentDialog() {
 
 			// Refresh issues after a short delay, preserving selection
 			issueID := issue.ID
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 	form.AddButton("Cancel", func() {
@@ -105,9 +103,7 @@ func (h *DialogHelpers) ShowCommentDialog() {
 				h.Pages.RemovePage("comment_dialog")
 				h.App.SetFocus(h.IssueList)
 				issueID := issue.ID
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues(issueID)
-				})
+				h.ScheduleRefresh(issueID)
 			}
 			return nil
 		}
@@ -167,9 +163,7 @@ func (h *DialogHelpers) ShowRenameDialog() {
 
 			// Refresh issues after a short delay, preserving selection
 			issueID := issue.ID
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 	form.AddButton("Cancel", func() {
@@ -203,9 +197,7 @@ func (h *DialogHelpers) ShowRenameDialog() {
 				h.Pages.RemovePage("rename_dialog")
 				h.App.SetFocus(h.IssueList)
 				issueID := issue.ID
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues(issueID)
-				})
+				h.ScheduleRefresh(issueID)
 			}
 			return nil
 		}
@@ -715,9 +707,7 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Added [%s]%s[-] dependency to [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), depType, formatting.GetAccentColor(), targetID))
 			h.Pages.RemovePage("dependency_dialog")
 			h.App.SetFocus(h.IssueList)
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 
@@ -740,9 +730,7 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 					h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Removed [%s]%s[-] dependency to [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), depToRemove.Type, formatting.GetAccentColor(), depToRemove.DependsOnID))
 					h.Pages.RemovePage("dependency_dialog")
 					h.App.SetFocus(h.IssueList)
-					time.AfterFunc(500*time.Millisecond, func() {
-						h.RefreshIssues(issueID)
-					})
+					h.ScheduleRefresh(issueID)
 				}
 			})
 		}
@@ -833,9 +821,7 @@ func (h *DialogHelpers) ShowLabelDialog() {
 			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Added label [%s]'%s'[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), trimmedLabel))
 			h.Pages.RemovePage("label_dialog")
 			h.App.SetFocus(h.IssueList)
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 
@@ -858,9 +844,7 @@ func (h *DialogHelpers) ShowLabelDialog() {
 					h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Removed label [%s]'%s'[-][-]", formatting.GetSuccessColor(), formatting.GetEmphasisColor(), labelToRemove))
 					h.Pages.RemovePage("label_dialog")
 					h.App.SetFocus(h.IssueList)
-					time.AfterFunc(500*time.Millisecond, func() {
-						h.RefreshIssues(issueID)
-					})
+					h.ScheduleRefresh(issueID)
 				}
 			})
 		}
@@ -931,9 +915,7 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Closed [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), closedIssue.ID))
 			h.Pages.RemovePage("close_issue_dialog")
 			h.App.SetFocus(h.IssueList)
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 	form.AddButton("Cancel", func() {
@@ -965,9 +947,7 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Closed [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), closedIssue.ID))
 				h.Pages.RemovePage("close_issue_dialog")
 				h.App.SetFocus(h.IssueList)
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues(issueID)
-				})
+				h.ScheduleRefresh(issueID)
 			}
 			return nil
 		}
@@ -1027,9 +1007,7 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 			h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Reopened [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), reopenedIssue.ID))
 			h.Pages.RemovePage("reopen_issue_dialog")
 			h.App.SetFocus(h.IssueList)
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues(issueID)
-			})
+			h.ScheduleRefresh(issueID)
 		}
 	})
 	form.AddButton("Cancel", func() {
@@ -1061,9 +1039,7 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Reopened [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), reopenedIssue.ID))
 				h.Pages.RemovePage("reopen_issue_dialog")
 				h.App.SetFocus(h.IssueList)
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues(issueID)
-				})
+				h.ScheduleRefresh(issueID)
 			}
 			return nil
 		}
@@ -1199,9 +1175,7 @@ func (h *DialogHelpers) ShowEditForm() {
 				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Updated [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), updatedIssue.ID))
 				h.Pages.RemovePage("edit_form")
 				h.App.SetFocus(h.IssueList)
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues(issueID)
-				})
+				h.ScheduleRefresh(issueID)
 			}
 		}
 	}
@@ -1472,9 +1446,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 			h.App.SetFocus(h.IssueList)
 
 			// Refresh issues after a short delay
-			time.AfterFunc(500*time.Millisecond, func() {
-				h.RefreshIssues()
-			})
+			h.ScheduleRefresh("")
 		}
 	})
 	form.AddButton("Cancel", func() {
@@ -1521,9 +1493,7 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Created [%s]%s[-][-]", formatting.GetSuccessColor(), formatting.GetAccentColor(), createdIssue.ID))
 				h.Pages.RemovePage("create_issue")
 				h.App.SetFocus(h.IssueList)
-				time.AfterFunc(500*time.Millisecond, func() {
-					h.RefreshIssues()
-				})
+				h.ScheduleRefresh("")
 			}
 			return nil
 		}

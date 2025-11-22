@@ -259,9 +259,35 @@ func main() {
 	// Mutex to serialize refresh operations
 	var refreshMutex sync.Mutex
 
+	// Refresh timer for single-flight pattern (prevent timer pile-up)
+	var refreshTimer *time.Timer
+	var refreshTimerMutex sync.Mutex
+
+	// Forward declare refreshIssues for use in scheduleRefresh
+	var refreshIssues func(...string)
+
+	// scheduleRefresh schedules a delayed refresh, cancelling any pending refresh
+	// This prevents timer pile-up when user performs rapid actions
+	scheduleRefresh := func(issueID string) {
+		refreshTimerMutex.Lock()
+		defer refreshTimerMutex.Unlock()
+
+		// Cancel existing timer if present
+		if refreshTimer != nil {
+			refreshTimer.Stop()
+		}
+
+		// Schedule new refresh
+		refreshTimer = time.AfterFunc(500*time.Millisecond, func() {
+			log.Printf("SCHEDULE: Delayed refresh starting for issue: %s", issueID)
+			refreshIssues(issueID)
+		})
+		log.Printf("SCHEDULE: Refresh scheduled in 500ms for issue: %s", issueID)
+	}
+
 	// Function to load and display issues (for async updates after app starts)
 	// preserveIssueID: if provided, attempt to restore selection to this issue after refresh
-	refreshIssues := func(preserveIssueID ...string) {
+	refreshIssues = func(preserveIssueID ...string) {
 		// Serialize refreshes to prevent concurrent access
 		refreshMutex.Lock()
 		defer refreshMutex.Unlock()
@@ -588,13 +614,14 @@ func main() {
 	// Helper function to show comment dialog
 	// Create dialog helpers for all dialog functions
 	dialogHelpers := &DialogHelpers{
-		App:           app,
-		Pages:         pages,
-		IssueList:     issueList,
-		IndexToIssue:  &indexToIssue,
-		StatusBar:     statusBar,
-		AppState:      appState,
-		RefreshIssues: refreshIssues,
+		App:             app,
+		Pages:           pages,
+		IssueList:       issueList,
+		IndexToIssue:    &indexToIssue,
+		StatusBar:       statusBar,
+		AppState:        appState,
+		RefreshIssues:   refreshIssues,
+		ScheduleRefresh: scheduleRefresh,
 	}
 
 	// Helper function to show comment dialog
@@ -849,9 +876,7 @@ func main() {
 						statusBar.SetText(errorMsg(fmt.Sprintf("Error updating status: %v", err)))
 					} else {
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Set %s to %s", updatedIssue.ID, updatedIssue.Status)))
-						time.AfterFunc(500*time.Millisecond, func() {
-							refreshIssues(issueID)
-						})
+						scheduleRefresh(issueID)
 					}
 				}
 				lastKeyWasS = false
@@ -1044,10 +1069,7 @@ func main() {
 						statusBar.SetText(successMsg(fmt.Sprintf("✓ Set %s to P%d", updatedIssue.ID, updatedIssue.Priority)))
 						// Refresh issues after a short delay, preserving selection
 						log.Printf("BD COMMAND: Scheduling refresh in 500ms")
-						time.AfterFunc(500*time.Millisecond, func() {
-							log.Printf("BD COMMAND: Delayed refresh starting")
-							refreshIssues(issueID)
-						})
+						scheduleRefresh(issueID)
 					}
 				}
 				return nil
