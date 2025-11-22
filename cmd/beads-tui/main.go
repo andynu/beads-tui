@@ -164,6 +164,9 @@ func main() {
 	// Two-character shortcut state
 	var lastKeyWasS bool // For status shortcuts (So, Si, Sb, Sc)
 
+	// ESC to quit state (double-press within 1 second)
+	var lastEscapeTime time.Time
+
 	// Mouse mode state (default: enabled)
 	var mouseEnabled = true
 
@@ -789,6 +792,38 @@ func main() {
 
 		// Normal mode key bindings (issue list focused)
 		switch event.Key() {
+		case tcell.KeyEscape:
+			// Clear search matches on ESC if any exist
+			if len(searchMatches) > 0 {
+				searchMatches = nil
+				currentSearchIndex = -1
+				statusBar.SetText(getStatusBarText())
+				return nil
+			}
+
+			// Double ESC to quit (vim-style)
+			now := time.Now()
+			if !lastEscapeTime.IsZero() && now.Sub(lastEscapeTime) < time.Second {
+				// Second ESC within 1 second - quit
+				app.Stop()
+				return nil
+			}
+			// First ESC - show hint
+			lastEscapeTime = now
+			statusBar.SetText(fmt.Sprintf("[%s]Press ESC again to quit (or 'q')[-]", formatting.GetEmphasisColor()))
+
+			// Clear the hint after 1 second
+			go func() {
+				time.Sleep(time.Second)
+				// Reset ESC state after timeout
+				if time.Since(lastEscapeTime) >= time.Second {
+					lastEscapeTime = time.Time{}
+					app.QueueUpdateDraw(func() {
+						statusBar.SetText(getStatusBarText())
+					})
+				}
+			}()
+			return nil
 		case tcell.KeyTab:
 			// Focus detail panel
 			detailPanelFocused = true
@@ -1095,14 +1130,6 @@ func main() {
 				// Reset all multi-key flags if any other key is pressed
 				lastKeyWasG = false
 				lastKeyWasS = false
-			}
-		case tcell.KeyEscape:
-			// Clear search on ESC
-			if len(searchMatches) > 0 {
-				searchMatches = nil
-				currentSearchIndex = -1
-				statusBar.SetText(getStatusBarText())
-				return nil
 			}
 		default:
 			lastKeyWasG = false
