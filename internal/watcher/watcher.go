@@ -2,6 +2,8 @@ package watcher
 
 import (
 	"fmt"
+	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -14,6 +16,7 @@ type Watcher struct {
 	debounceDelay time.Duration
 	onChange      func()
 	stopCh        chan struct{}
+	errorCount    atomic.Uint64
 }
 
 // New creates a new file watcher
@@ -57,6 +60,11 @@ func (w *Watcher) Stop() error {
 	return w.watcher.Close()
 }
 
+// ErrorCount returns the number of errors encountered by the watcher
+func (w *Watcher) ErrorCount() uint64 {
+	return w.errorCount.Load()
+}
+
 // watchLoop runs the main watch loop with debouncing
 func (w *Watcher) watchLoop() {
 	var debounceTimer *time.Timer
@@ -84,8 +92,9 @@ func (w *Watcher) watchLoop() {
 			if !ok {
 				return
 			}
-			// In a real app, you might want to log this or handle it
-			_ = err
+			// Log watcher errors for debugging
+			w.errorCount.Add(1)
+			log.Printf("WATCHER ERROR: path=%s count=%d error=%v", w.path, w.errorCount.Load(), err)
 
 		case <-w.stopCh:
 			if debounceTimer != nil {
