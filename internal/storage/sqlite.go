@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/andy/beads-tui/internal/parser"
@@ -13,12 +14,15 @@ import (
 
 // SQLiteReader reads issues directly from .beads/beads.db
 type SQLiteReader struct {
-	db *sql.DB
+	db     *sql.DB
+	dbPath string // Store path for reconnection
 }
 
 // NewSQLiteReader creates a new SQLite reader for the given database path
 // Opens in read-only mode to avoid any write locking
 func NewSQLiteReader(dbPath string) (*SQLiteReader, error) {
+	log.Printf("SQLite: Opening database at %s", dbPath)
+
 	// Open in read-only mode using file: URI scheme
 	// ncruces/go-sqlite3 requires file: prefix for proper WAL support
 	db, err := sql.Open("sqlite3", "file:"+dbPath+"?mode=ro")
@@ -52,12 +56,97 @@ func NewSQLiteReader(dbPath string) (*SQLiteReader, error) {
 		return nil, fmt.Errorf("database does not contain issues table - has beads been initialized?")
 	}
 
-	return &SQLiteReader{db: db}, nil
+	log.Printf("SQLite: Database connection established successfully")
+	return &SQLiteReader{db: db, dbPath: dbPath}, nil
+}
+
+// healthCheck pings the database and reconnects if the connection is stale
+func (r *SQLiteReader) healthCheck(ctx context.Context) error {
+	// Try to ping the database
+	if err := r.db.PingContext(ctx); err != nil {
+		log.Printf("SQLite: Health check failed, attempting reconnection: %v", err)
+		return r.reconnect(ctx)
+	}
+	return nil
+}
+
+// reconnect closes the current connection and establishes a new one
+// Uses exponential backoff for retries
+func (r *SQLiteReader) reconnect(ctx context.Context) error {
+	// Close stale connection
+	if r.db != nil {
+		log.Printf("SQLite: Closing stale connection")
+		r.db.Close()
+	}
+
+	// Retry with exponential backoff
+	maxRetries := 3
+	baseDelay := 100 * time.Millisecond
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := baseDelay * time.Duration(1<<uint(attempt-1)) // 100ms, 200ms, 400ms
+			log.Printf("SQLite: Reconnection attempt %d/%d after %v", attempt+1, maxRetries, delay)
+
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		// Reopen database
+		db, err := sql.Open("sqlite3", "file:"+r.dbPath+"?mode=ro")
+		if err != nil {
+			log.Printf("SQLite: Failed to reopen database: %v", err)
+			continue
+		}
+
+		// Set connection pool limits
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		db.SetConnMaxLifetime(5 * time.Minute)
+
+		// Test connection with timeout
+		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		if err := db.PingContext(pingCtx); err != nil {
+			cancel()
+			db.Close()
+			log.Printf("SQLite: Reconnection ping failed: %v", err)
+			continue
+		}
+		cancel()
+
+		// Verify schema still exists
+		var tableCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'").Scan(&tableCount)
+		if err != nil {
+			db.Close()
+			log.Printf("SQLite: Schema verification failed: %v", err)
+			continue
+		}
+		if tableCount == 0 {
+			db.Close()
+			log.Printf("SQLite: Database schema missing (issues table not found)")
+			continue
+		}
+
+		r.db = db
+		log.Printf("SQLite: Reconnection successful")
+		return nil
+	}
+
+	return fmt.Errorf("failed to reconnect after %d attempts", maxRetries)
 }
 
 // LoadIssues reads all issues from the database with dependencies, labels, and comments
 // Uses read-only transaction to ensure consistent snapshot
+// Includes health check and automatic reconnection on stale connections
 func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) {
+	// Health check before reading
+	if err := r.healthCheck(ctx); err != nil {
+		return nil, fmt.Errorf("database health check failed: %w", err)
+	}
 	// Begin read-only transaction for consistent snapshot
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -246,6 +335,7 @@ func (r *SQLiteReader) loadAllCommentsTx(ctx context.Context, tx *sql.Tx) (map[s
 // Close closes the database connection
 func (r *SQLiteReader) Close() error {
 	if r.db != nil {
+		log.Printf("SQLite: Closing database connection")
 		return r.db.Close()
 	}
 	return nil

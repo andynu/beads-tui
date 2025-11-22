@@ -488,8 +488,8 @@ func TestLoadIssues_ContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error with cancelled context")
 	}
-	// Error should mention context cancellation (wrapped error)
-	if err.Error() != "failed to begin transaction: context canceled" {
+	// Error should mention context cancellation (wrapped error from health check)
+	if err.Error() != "database health check failed: context canceled" {
 		t.Errorf("Expected context cancellation error, got: %v", err)
 	}
 }
