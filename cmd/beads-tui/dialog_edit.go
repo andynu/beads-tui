@@ -145,15 +145,8 @@ func (h *DialogHelpers) ShowEditForm() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Ctrl-S and q key handlers
+	// Add Ctrl-S handler for save
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// Handle 'q' to cancel
-		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
-			h.Pages.RemovePage("edit_form")
-			h.App.SetFocus(h.IssueList)
-			return nil
-		}
-
 		if event.Key() == tcell.KeyCtrlS {
 			saveChanges()
 			return nil

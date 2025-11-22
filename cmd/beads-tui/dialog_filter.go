@@ -128,15 +128,10 @@ func (h *DialogHelpers) ShowQuickFilter() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Enter and q key handlers
+	// Add Enter key handler to apply filter
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEnter {
 			applyQuickFilter()
-			return nil
-		}
-		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
-			h.Pages.RemovePage("quick_filter")
-			h.App.SetFocus(h.IssueList)
 			return nil
 		}
 		return event
