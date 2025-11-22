@@ -147,9 +147,9 @@ func (h *DialogHelpers) ShowStatsOverlay() {
 			AddItem(nil, 0, 1, false), 0, 2, true).
 		AddItem(nil, 0, 1, false)
 
-	// Add input capture to close on ESC or S
+	// Add input capture to close on ESC, q, or S
 	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && (event.Rune() == 'S' || event.Rune() == 's')) {
+		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && (event.Rune() == 'S' || event.Rune() == 's' || event.Rune() == 'q')) {
 			h.Pages.RemovePage("stats")
 			h.App.SetFocus(h.IssueList)
 			return nil

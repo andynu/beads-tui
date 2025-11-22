@@ -259,8 +259,15 @@ func (h *DialogHelpers) ShowCreateIssueDialog() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Ctrl-S handler to submit form (Ctrl-Enter is reserved by terminal)
+	// Add Ctrl-S and q key handlers
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Handle 'q' to cancel
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("create_issue")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+
 		if event.Key() == tcell.KeyCtrlS {
 			// Ctrl-S pressed - submit form
 			if title == "" {

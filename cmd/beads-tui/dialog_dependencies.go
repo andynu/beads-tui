@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/andy/beads-tui/internal/formatting"
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -104,6 +105,16 @@ func (h *DialogHelpers) ShowDependencyDialog() {
 	form.SetCancelFunc(func() {
 		h.Pages.RemovePage("dependency_dialog")
 		h.App.SetFocus(h.IssueList)
+	})
+
+	// Add q key handler
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("dependency_dialog")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+		return event
 	})
 
 	// Create modal (centered)

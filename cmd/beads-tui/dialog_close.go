@@ -65,8 +65,15 @@ func (h *DialogHelpers) ShowCloseIssueDialog() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Enter key handler to close
+	// Add Enter and q key handlers
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Handle 'q' to cancel
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("close_issue_dialog")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+
 		if event.Key() == tcell.KeyEnter {
 			issueID := issue.ID
 			args := []string{"close", issueID}
@@ -157,8 +164,15 @@ func (h *DialogHelpers) ShowReopenIssueDialog() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Enter key handler to reopen
+	// Add Enter and q key handlers
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Handle 'q' to cancel
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("reopen_issue_dialog")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+
 		if event.Key() == tcell.KeyEnter {
 			issueID := issue.ID
 			args := []string{"reopen", issueID}

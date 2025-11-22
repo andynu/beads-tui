@@ -132,9 +132,9 @@ func (h *DialogHelpers) ShowHelpScreen() {
 			AddItem(nil, 0, 1, false), 0, 2, true).
 		AddItem(nil, 0, 1, false)
 
-	// Add input capture to close on ESC or ?
+	// Add input capture to close on ESC, q, or ?
 	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && event.Rune() == '?') {
+		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && (event.Rune() == '?' || event.Rune() == 'q')) {
 			h.Pages.RemovePage("help")
 			h.App.SetFocus(h.IssueList)
 			return nil

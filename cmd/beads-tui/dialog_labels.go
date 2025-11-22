@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andy/beads-tui/internal/formatting"
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -108,6 +109,16 @@ func (h *DialogHelpers) ShowLabelDialog() {
 	form.SetCancelFunc(func() {
 		h.Pages.RemovePage("label_dialog")
 		h.App.SetFocus(h.IssueList)
+	})
+
+	// Add q key handler
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("label_dialog")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+		return event
 	})
 
 	// Create modal (centered)

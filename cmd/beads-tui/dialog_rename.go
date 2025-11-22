@@ -63,8 +63,15 @@ func (h *DialogHelpers) ShowRenameDialog() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Ctrl-S handler for save
+	// Add Ctrl-S and q key handlers
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Handle 'q' to cancel
+		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+			h.Pages.RemovePage("rename_dialog")
+			h.App.SetFocus(h.IssueList)
+			return nil
+		}
+
 		if event.Key() == tcell.KeyCtrlS {
 			// Save directly
 			if newTitle == "" {
