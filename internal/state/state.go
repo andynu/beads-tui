@@ -22,6 +22,10 @@ type State struct {
 	viewMode         ViewMode
 	treeNodes        []*TreeNode
 
+	// Computed blocking state (includes dependency-based blocking)
+	// This is set by categorizeIssues() and used by IsEffectivelyBlocked()
+	effectivelyBlocked map[string]bool
+
 	// Filter state
 	priorityFilter map[int]bool              // nil = no filter, otherwise only show these priorities
 	typeFilter     map[parser.IssueType]bool // nil = no filter, otherwise only show these types
@@ -91,30 +95,32 @@ func (s *State) LoadIssues(issues []*parser.Issue) {
 }
 
 // categorizeIssues separates issues into ready, blocked, in_progress, and closed
+// This matches bd ready behavior:
+// - An issue is blocked if it has a "blocks" dependency on an open issue
+// - Blocking propagates through parent-child relationships (children of blocked parents are blocked)
+// - "related" and "discovered-from" dependencies do NOT block
+// - Explicit status:blocked does NOT propagate to children
 func (s *State) categorizeIssues() {
 	// Build a map of issues that are blocked by open dependencies
+	// This map is stored in s.effectivelyBlocked for use by IsEffectivelyBlocked()
 	blockedByIssueIDs := make(map[string]bool)
 
+	// Build parent-child map (child ID -> parent ID)
+	parentMap := make(map[string]string)
 	for _, issue := range s.issues {
-		// Check if this issue blocks any other issues
 		for _, dep := range issue.Dependencies {
-			// If this is a "blocks" dependency and the blocking issue is not closed
-			if dep.Type == parser.DepBlocks && issue.Status != parser.StatusClosed {
-				// The issue that depends on this one (dep.DependsOnID) is blocked
-				// Note: in beads JSONL, dependencies are stored on the issue that has them
-				// dep.IssueID is the current issue, dep.DependsOnID is what it depends on
-				// So we need to check if current issue blocks others by looking at reverse deps
+			if dep.Type == parser.DepParentChild {
+				// issue is a child of dep.DependsOnID
+				parentMap[issue.ID] = dep.DependsOnID
 			}
 		}
 	}
 
-	// Build reverse dependency map (who blocks whom)
-	// For each issue, find all issues it blocks
+	// First pass: Mark issues with direct "blocks" dependencies on open issues
 	for _, issue := range s.issues {
 		for _, dep := range issue.Dependencies {
 			if dep.Type == parser.DepBlocks {
-				// issue depends on dep.DependsOnID
-				// So dep.DependsOnID blocks issue
+				// issue depends on dep.DependsOnID (issue is blocked by dep.DependsOnID)
 				targetIssue := s.issuesByID[dep.DependsOnID]
 				if targetIssue != nil && targetIssue.Status != parser.StatusClosed {
 					// This issue is blocked by an open dependency
@@ -123,6 +129,29 @@ func (s *State) categorizeIssues() {
 			}
 		}
 	}
+
+	// Second pass: Propagate blocking through parent-child relationships
+	// If a parent is blocked, all its children are also blocked
+	// Repeat until no changes (for deep hierarchies)
+	changed := true
+	for changed {
+		changed = false
+		for _, issue := range s.issues {
+			if blockedByIssueIDs[issue.ID] {
+				continue // Already blocked
+			}
+			// Check if this issue's parent is blocked
+			if parentID, hasParent := parentMap[issue.ID]; hasParent {
+				if blockedByIssueIDs[parentID] {
+					blockedByIssueIDs[issue.ID] = true
+					changed = true
+				}
+			}
+		}
+	}
+
+	// Store the computed blocking state for use by IsEffectivelyBlocked()
+	s.effectivelyBlocked = blockedByIssueIDs
 
 	// Categorize each issue
 	for _, issue := range s.issues {
@@ -134,7 +163,7 @@ func (s *State) categorizeIssues() {
 		case parser.StatusBlocked:
 			s.blockedIssues = append(s.blockedIssues, issue)
 		case parser.StatusOpen:
-			// Check if actually blocked by dependencies
+			// Check if actually blocked by dependencies (direct or via parent)
 			if blockedByIssueIDs[issue.ID] {
 				s.blockedIssues = append(s.blockedIssues, issue)
 			} else {
@@ -142,6 +171,24 @@ func (s *State) categorizeIssues() {
 			}
 		}
 	}
+}
+
+// IsEffectivelyBlocked returns true if the issue is blocked either by:
+// - Explicit status:blocked
+// - A "blocks" dependency on an open issue
+// - Being a child of a blocked parent (transitive)
+// This is useful for rendering where we want consistent status display
+func (s *State) IsEffectivelyBlocked(issueID string) bool {
+	issue := s.issuesByID[issueID]
+	if issue == nil {
+		return false
+	}
+	// Explicit blocked status
+	if issue.Status == parser.StatusBlocked {
+		return true
+	}
+	// Blocked by dependency (computed in categorizeIssues)
+	return s.effectivelyBlocked[issueID]
 }
 
 // applyFilters filters a list of issues based on active filters

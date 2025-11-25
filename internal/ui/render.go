@@ -36,7 +36,7 @@ func PopulateIssueList(
 		treeNodes := appState.GetTreeNodes()
 		for i, node := range treeNodes {
 			isLast := i == len(treeNodes)-1
-			renderTreeNode(issueList, node, "", isLast, &currentIndex, indexToIssue)
+			renderTreeNode(issueList, appState, node, "", isLast, &currentIndex, indexToIssue)
 		}
 	} else {
 		// List view (original behavior)
@@ -130,6 +130,7 @@ func formatIssueListItem(issue *parser.Issue, statusIcon string) string {
 // renderTreeNode recursively renders a tree node and its children
 func renderTreeNode(
 	issueList *tview.List,
+	appState *state.State,
 	node *state.TreeNode,
 	prefix string,
 	isLast bool,
@@ -153,22 +154,30 @@ func renderTreeNode(
 		}
 	}
 
-	// Get status indicator
+	// Get status indicator - use effective blocking status for consistent display
+	// This ensures issues blocked by dependencies show as blocked even if their
+	// explicit status is "open"
 	var statusIcon string
-	switch issue.Status {
-	case parser.StatusOpen:
-		statusIcon = "●"
-	case parser.StatusBlocked:
-		statusIcon = "○"
-	case parser.StatusInProgress:
+	var statusColor string
+	switch {
+	case issue.Status == parser.StatusClosed:
+		statusIcon = "✓"
+		statusColor = formatting.GetStatusColor(parser.StatusClosed)
+	case issue.Status == parser.StatusInProgress:
 		statusIcon = "◆"
+		statusColor = formatting.GetStatusColor(parser.StatusInProgress)
+	case appState.IsEffectivelyBlocked(issue.ID):
+		// Blocked by explicit status OR by dependency
+		statusIcon = "○"
+		statusColor = formatting.GetStatusColor(parser.StatusBlocked)
 	default:
-		statusIcon = "·"
+		// Ready (open and not blocked)
+		statusIcon = "●"
+		statusColor = formatting.GetStatusColor(parser.StatusOpen)
 	}
 
 	// Format issue line
 	priorityColor := formatting.GetPriorityColor(issue.Priority)
-	statusColor := formatting.GetStatusColor(issue.Status)
 	typeIcon := formatting.GetTypeIcon(issue.IssueType)
 	text := fmt.Sprintf("%s%s[%s]%s[-] %s [%s]%s[-] [P%d] %s",
 		prefix, branch, statusColor, statusIcon, typeIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
@@ -194,7 +203,7 @@ func renderTreeNode(
 	for i, child := range node.Children {
 		isLastChild := i == len(node.Children)-1
 		newPrefix := prefix + continuation
-		renderTreeNode(issueList, child, newPrefix, isLastChild, currentIndex, indexToIssue)
+		renderTreeNode(issueList, appState, child, newPrefix, isLastChild, currentIndex, indexToIssue)
 	}
 }
 

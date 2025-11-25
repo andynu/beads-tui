@@ -921,3 +921,283 @@ func TestIDBasedParentChildRelationship(t *testing.T) {
 		}
 	}
 }
+
+// TestBlockingPropagatesThroughParentChild verifies that blocking propagates
+// through parent-child relationships, matching bd ready behavior
+func TestBlockingPropagatesThroughParentChild(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	// Setup:
+	// - blocker (open) blocks epic
+	// - epic has child-a and child-b via parent-child
+	// - child-a has grandchild via parent-child
+	// Expected: All of epic, child-a, child-b, grandchild should be blocked
+	issues := []*parser.Issue{
+		{
+			ID:        "blocker",
+			Title:     "Blocker Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "epic",
+			Title:     "Epic",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeEpic,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "epic",
+					DependsOnID: "blocker",
+					Type:        parser.DepBlocks,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "child-a",
+			Title:     "Child A",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "child-a",
+					DependsOnID: "epic",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "child-b",
+			Title:     "Child B",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "child-b",
+					DependsOnID: "epic",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "grandchild",
+			Title:     "Grandchild",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "grandchild",
+					DependsOnID: "child-a",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "unrelated",
+			Title:     "Unrelated Issue",
+			Status:    parser.StatusOpen,
+			Priority:  3,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	}
+
+	state.LoadIssues(issues)
+
+	// Only blocker and unrelated should be ready
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 2 {
+		t.Errorf("Expected 2 ready issues, got %d", len(readyIssues))
+		for _, issue := range readyIssues {
+			t.Logf("  Ready: %s", issue.ID)
+		}
+	}
+
+	readyIDs := make(map[string]bool)
+	for _, issue := range readyIssues {
+		readyIDs[issue.ID] = true
+	}
+
+	if !readyIDs["blocker"] {
+		t.Error("Expected 'blocker' to be ready")
+	}
+	if !readyIDs["unrelated"] {
+		t.Error("Expected 'unrelated' to be ready")
+	}
+
+	// epic, child-a, child-b, grandchild should all be blocked
+	blockedIssues := state.GetBlockedIssues()
+	if len(blockedIssues) != 4 {
+		t.Errorf("Expected 4 blocked issues, got %d", len(blockedIssues))
+		for _, issue := range blockedIssues {
+			t.Logf("  Blocked: %s", issue.ID)
+		}
+	}
+
+	blockedIDs := make(map[string]bool)
+	for _, issue := range blockedIssues {
+		blockedIDs[issue.ID] = true
+	}
+
+	expectedBlocked := []string{"epic", "child-a", "child-b", "grandchild"}
+	for _, id := range expectedBlocked {
+		if !blockedIDs[id] {
+			t.Errorf("Expected '%s' to be blocked", id)
+		}
+	}
+}
+
+// TestRelatedAndDiscoveredFromDontBlock verifies that related and discovered-from
+// dependencies do NOT cause blocking
+func TestRelatedAndDiscoveredFromDontBlock(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	issues := []*parser.Issue{
+		{
+			ID:        "blocker",
+			Title:     "Blocker Issue",
+			Status:    parser.StatusOpen,
+			Priority:  1,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "related-issue",
+			Title:     "Related Issue",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "related-issue",
+					DependsOnID: "blocker",
+					Type:        parser.DepRelated,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+		{
+			ID:        "discovered-issue",
+			Title:     "Discovered Issue",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "discovered-issue",
+					DependsOnID: "blocker",
+					Type:        parser.DepDiscoveredFrom,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+	}
+
+	state.LoadIssues(issues)
+
+	// All three should be ready (related and discovered-from don't block)
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 3 {
+		t.Errorf("Expected 3 ready issues, got %d", len(readyIssues))
+		for _, issue := range readyIssues {
+			t.Logf("  Ready: %s", issue.ID)
+		}
+	}
+
+	blockedIssues := state.GetBlockedIssues()
+	if len(blockedIssues) != 0 {
+		t.Errorf("Expected 0 blocked issues, got %d", len(blockedIssues))
+		for _, issue := range blockedIssues {
+			t.Logf("  Blocked: %s", issue.ID)
+		}
+	}
+}
+
+// TestExplicitBlockedStatusDoesNotPropagate verifies that explicit status:blocked
+// does NOT propagate to children (only blocks dependencies propagate)
+func TestExplicitBlockedStatusDoesNotPropagate(t *testing.T) {
+	state := New()
+	now := time.Now()
+
+	issues := []*parser.Issue{
+		{
+			ID:        "parent",
+			Title:     "Parent with status:blocked",
+			Status:    parser.StatusBlocked, // Explicitly blocked
+			Priority:  2,
+			IssueType: parser.TypeEpic,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "child",
+			Title:     "Child of blocked parent",
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+			Dependencies: []*parser.Dependency{
+				{
+					IssueID:     "child",
+					DependsOnID: "parent",
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			},
+		},
+	}
+
+	state.LoadIssues(issues)
+
+	// Child should be ready - explicit status doesn't propagate
+	readyIssues := state.GetReadyIssues()
+	if len(readyIssues) != 1 {
+		t.Errorf("Expected 1 ready issue, got %d", len(readyIssues))
+	}
+	if len(readyIssues) > 0 && readyIssues[0].ID != "child" {
+		t.Errorf("Expected 'child' to be ready, got %s", readyIssues[0].ID)
+	}
+
+	// Parent should be blocked (explicit status)
+	blockedIssues := state.GetBlockedIssues()
+	if len(blockedIssues) != 1 {
+		t.Errorf("Expected 1 blocked issue, got %d", len(blockedIssues))
+	}
+	if len(blockedIssues) > 0 && blockedIssues[0].ID != "parent" {
+		t.Errorf("Expected 'parent' to be blocked, got %s", blockedIssues[0].ID)
+	}
+}
