@@ -4,17 +4,19 @@ This document describes how releases are automated for beads-tui.
 
 ## How It Works
 
-When you push a version tag (e.g., `v1.2.3`), GitHub Actions automatically:
+When you push a version tag (e.g., `v1.2.3`), GitHub Actions runs [GoReleaser](https://goreleaser.com/) which:
 
 1. Builds binaries for 4 platforms:
-   - macOS Intel (`darwin-amd64`)
-   - macOS Apple Silicon (`darwin-arm64`)
-   - Linux x86_64 (`linux-amd64`)
-   - Linux ARM64 (`linux-arm64`)
+   - macOS Intel (`darwin_amd64`)
+   - macOS Apple Silicon (`darwin_arm64`)
+   - Linux x86_64 (`linux_amd64`)
+   - Linux ARM64 (`linux_arm64`)
 
-2. Creates a GitHub Release with all binaries attached
+2. Creates `.tar.gz` archives for each platform
 
-3. Auto-generates release notes from commits since the last tag
+3. Generates `checksums.txt` for verification
+
+4. Creates a GitHub Release with changelog from commits
 
 ## Creating a Release
 
@@ -28,9 +30,14 @@ git push origin v1.2.3
 
 The release will appear at: https://github.com/andynu/beads-tui/releases
 
-## Authentication Setup
+## Configuration Files
 
-The release workflow requires a Personal Access Token (PAT) because `GITHUB_TOKEN` has a limitation where it cannot create releases on non-HEAD commits ([details](https://github.com/orgs/community/discussions/121022)).
+- `.goreleaser.yaml` - GoReleaser build configuration
+- `.github/workflows/release.yml` - GitHub Actions workflow
+
+## Authentication (PAT Workaround)
+
+Due to a [GitHub bug affecting new repositories](https://github.com/orgs/community/discussions/180369), the workflow uses a Personal Access Token instead of the default `GITHUB_TOKEN`.
 
 ### Token Configuration
 
@@ -39,7 +46,23 @@ The release workflow requires a Personal Access Token (PAT) because `GITHUB_TOKE
 - **Required Scope:** `repo` (full control of private repositories)
 - **Current Expiration:** ~90 days from 2025-11-25 (expires around 2025-02-23)
 
-### Renewing the Token
+### When GitHub Fixes the Bug
+
+Once GitHub resolves [Discussion #180369](https://github.com/orgs/community/discussions/180369), edit `.github/workflows/release.yml` and change:
+
+```yaml
+GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+```
+
+to:
+
+```yaml
+GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+Then the PAT will no longer be needed.
+
+### Renewing the Token (If Still Needed)
 
 When the token expires, release workflows will fail. To renew:
 
@@ -58,31 +81,31 @@ When the token expires, release workflows will fail. To renew:
    - Paste the new token
    - Click "Update secret"
 
-3. **Test the workflow:**
-   ```bash
-   git tag -a v0.0.0-test -m "Test release workflow"
-   git push origin v0.0.0-test
-   # Verify the release is created, then delete it
-   gh release delete v0.0.0-test --yes
-   git tag -d v0.0.0-test
-   git push origin :refs/tags/v0.0.0-test
-   ```
+## Local Testing
 
-## Workflow Files
+You can test GoReleaser locally before pushing:
 
-- **CI:** `.github/workflows/ci.yml` - Runs tests and linting on push/PR
-- **Release:** `.github/workflows/release.yml` - Builds and publishes releases on tag push
+```bash
+# Install goreleaser
+go install github.com/goreleaser/goreleaser/v2@latest
+
+# Validate config
+goreleaser check
+
+# Dry run (builds but doesn't publish)
+goreleaser release --snapshot --clean
+```
 
 ## Troubleshooting
 
 ### "author_id does not have push access" error
 
-The PAT has expired or is missing. Follow the renewal steps above.
+This is the GitHub bug. Ensure `RELEASE_TOKEN` secret is set with a valid PAT.
 
-### Release created but no binaries
+### Release created but missing assets
 
 Check the workflow logs at https://github.com/andynu/beads-tui/actions for build failures.
 
-### Tests fail in CI
+### GoReleaser config errors
 
-Integration tests that require `bd` CLI are skipped in CI (using `-short` flag). If other tests fail, fix them before releasing.
+Run `goreleaser check` locally to validate `.goreleaser.yaml`.
