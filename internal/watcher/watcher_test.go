@@ -32,7 +32,7 @@ func TestWatcher(t *testing.T) {
 	if err := w.Start(); err != nil {
 		t.Fatalf("Failed to start watcher: %v", err)
 	}
-	defer w.Stop()
+	defer func() { _ = w.Stop() }()
 
 	// Wait a bit for watcher to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -72,7 +72,7 @@ func TestWatcherDebounce(t *testing.T) {
 	if err := w.Start(); err != nil {
 		t.Fatalf("Failed to start watcher: %v", err)
 	}
-	defer w.Stop()
+	defer func() { _ = w.Stop() }()
 
 	time.Sleep(100 * time.Millisecond)
 

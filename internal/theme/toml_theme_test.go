@@ -16,9 +16,8 @@ func TestLoadTOMLTheme(t *testing.T) {
 	}
 
 	// Test that colors are defined
-	priorities := theme.PriorityColors()
-	if len(priorities) != 5 {
-		t.Errorf("Expected 5 priority colors, got %d", len(priorities))
+	if len(theme.PriorityColors()) != 5 {
+		t.Errorf("Expected 5 priority colors, got %d", len(theme.PriorityColors()))
 	}
 
 	// Test status colors

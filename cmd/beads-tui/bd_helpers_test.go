@@ -313,7 +313,7 @@ func TestExecBdJSON_Integration_CreateAndUpdate(t *testing.T) {
 
 	// Clean up after test
 	defer func() {
-		exec.Command("rm", "-f", "/tmp/beads-tui-test.db").Run()
+		_ = exec.Command("rm", "-f", "/tmp/beads-tui-test.db").Run()
 	}()
 
 	// Test: Create an issue

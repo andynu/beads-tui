@@ -409,7 +409,7 @@ func main() {
 		}
 		defer func() {
 			log.Printf("WATCHER: Stopping file watcher")
-			fileWatcher.Stop()
+			_ = fileWatcher.Stop()
 		}()
 	}
 

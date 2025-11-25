@@ -156,8 +156,7 @@ func (ctx *AppContext) RestoreSelection(issueID string) {
 // GetCurrentIssue returns the currently selected issue, or nil if none selected
 func (ctx *AppContext) GetCurrentIssue() *parser.Issue {
 	currentIndex := ctx.IssueList.GetCurrentItem()
-	issue, _ := ctx.IndexToIssue[currentIndex]
-	return issue
+	return ctx.IndexToIssue[currentIndex]
 }
 
 // SetStatusMessage displays a temporary message in the status bar

@@ -15,10 +15,8 @@ type State struct {
 	blockedIssues    []*parser.Issue
 	inProgressIssues []*parser.Issue
 	closedIssues     []*parser.Issue
-	selectedIndex    int
 	selectedIssue    *parser.Issue
 	filterMode       FilterMode
-	searchQuery      string
 	viewMode         ViewMode
 	treeNodes        []*TreeNode
 

@@ -45,10 +45,8 @@ func (w *Watcher) Start() error {
 
 	// For SQLite databases, also watch the WAL file where changes are written
 	walPath := w.path + "-wal"
-	if err := w.watcher.Add(walPath); err != nil {
-		// WAL file might not exist yet, which is fine
-		// We'll still catch changes to the main DB file
-	}
+	// WAL file might not exist yet, which is fine - we'll still catch changes to the main DB file
+	_ = w.watcher.Add(walPath)
 
 	go w.watchLoop()
 	return nil

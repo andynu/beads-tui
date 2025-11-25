@@ -152,7 +152,7 @@ func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback() // Safe to call even after commit
+	defer func() { _ = tx.Rollback() }() // Safe to call even after commit
 
 	// Query all issues
 	rows, err := tx.QueryContext(ctx, `

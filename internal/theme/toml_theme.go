@@ -88,8 +88,8 @@ func LoadTOMLTheme(name string) (*TOMLTheme, error) {
 	data, err = embeddedThemes.ReadFile(embeddedPath)
 	if err != nil {
 		// Try loading from external user themes directory
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
+		homeDir, homeErr := os.UserHomeDir()
+		if homeErr == nil {
 			externalPath := filepath.Join(homeDir, ".config", "beads-tui", "themes", name+".toml")
 			data, err = os.ReadFile(externalPath)
 		}
@@ -252,7 +252,7 @@ func parseHexColor(hex string) tcell.Color {
 
 	// Parse hex string to uint32
 	var r, g, b uint32
-	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	_, _ = fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
 
 	// Combine into 24-bit color value
 	color := (r << 16) | (g << 8) | b

@@ -18,9 +18,8 @@ func TestDefaultTheme(t *testing.T) {
 	}
 
 	// Test priority colors
-	priorities := dt.PriorityColors()
-	if len(priorities) != 5 {
-		t.Errorf("Expected 5 priority colors, got %d", len(priorities))
+	if len(dt.PriorityColors()) != 5 {
+		t.Errorf("Expected 5 priority colors, got %d", len(dt.PriorityColors()))
 	}
 
 	// Test status colors
