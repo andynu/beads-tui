@@ -1,81 +1,31 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., v1.2.3)'
-        required: true
-        type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  goreleaser:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: darwin
-            goarch: amd64
-            suffix: darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            suffix: darwin-arm64
-          - goos: linux
-            goarch: amd64
-            suffix: linux-amd64
-          - goos: linux
-            goarch: arm64
-            suffix: linux-arm64
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
-      - name: Build binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          go build -ldflags="-s -w" -o beads-tui-${{ matrix.suffix }} ./cmd/beads-tui
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          name: beads-tui-${{ matrix.suffix }}
-          path: beads-tui-${{ matrix.suffix }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create tag and release
+          version: "~> v2"
+          args: release --clean
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Create the tag on HEAD (this is the key - we're always on HEAD)
-          git tag ${{ inputs.version }}
-          git push origin ${{ inputs.version }}
-
-          # Create the release
-          gh release create ${{ inputs.version }} \
-            --title "${{ inputs.version }}" \
-            --generate-notes \
-            artifacts/*/beads-tui-*
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
