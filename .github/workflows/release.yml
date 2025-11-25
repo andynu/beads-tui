@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.2.3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -63,14 +66,16 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create release
+      - name: Create tag and release
         env:
-          # GITHUB_TOKEN cannot create releases on non-HEAD commits
-          # Use a PAT stored in RELEASE_TOKEN secret instead
-          # See: https://github.com/orgs/community/discussions/121022
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "${{ github.ref_name }}" \
+          # Create the tag on HEAD (this is the key - we're always on HEAD)
+          git tag ${{ inputs.version }}
+          git push origin ${{ inputs.version }}
+
+          # Create the release
+          gh release create ${{ inputs.version }} \
+            --title "${{ inputs.version }}" \
             --generate-notes \
             artifacts/*/beads-tui-*
