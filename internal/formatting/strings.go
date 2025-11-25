@@ -29,3 +29,20 @@ func IndexCaseInsensitive(s, substr string) int {
 	}
 	return -1
 }
+
+// FormatIssueID returns the issue ID with or without its prefix.
+// If showPrefix is true, returns the full ID (e.g., "tui-abc").
+// If showPrefix is false, returns just the suffix after the hyphen (e.g., "abc").
+func FormatIssueID(id string, showPrefix bool) string {
+	if showPrefix {
+		return id
+	}
+	// Find the last hyphen and return everything after it
+	for i := len(id) - 1; i >= 0; i-- {
+		if id[i] == '-' {
+			return id[i+1:]
+		}
+	}
+	// No hyphen found, return as-is
+	return id
+}

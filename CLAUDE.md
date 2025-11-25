@@ -533,6 +533,7 @@ Update `app.SetInputCapture()` in `cmd/beads-tui/main.go`. Current bindings:
 - `Ctrl-f`: Scroll down full page (vim style)
 - `t`: Toggle between list and tree view
 - `m`: Toggle mouse mode on/off
+- `p`: Toggle issue ID prefix display (tui-abc vs abc)
 - `a`: Open issue creation dialog (vim-style "add")
 - `0`-`4`: Quick priority change (set current issue to P0-P4)
 - `s`: Toggle status (cycles: open → in_progress → blocked → closed → open)

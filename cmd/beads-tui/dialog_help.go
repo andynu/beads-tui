@@ -51,6 +51,7 @@ func (h *DialogHelpers) ShowHelpScreen() {
   t           Toggle between list and tree view
   T           Cycle to next theme (live theme switching)
   C           Toggle showing closed issues in list view
+  p           Toggle issue ID prefix (tui-abc vs abc)
   f           Quick filter (type: p1 bug, feature, etc.)
   S           Show statistics dashboard
   m           Toggle mouse mode on/off

@@ -182,6 +182,9 @@ func main() {
 	// Detail pane visibility (default: true)
 	var detailPaneVisible = true
 
+	// Show issue ID prefix (default: true)
+	var showPrefix = true
+
 	// Track currently displayed issue in detail panel (for clipboard copy)
 	var currentDetailIssue *parser.Issue
 
@@ -239,7 +242,7 @@ func main() {
 
 	// Helper function to populate issue list from state
 	populateIssueList := func() {
-		ui.PopulateIssueList(issueList, appState, showClosedIssues, indexToIssue)
+		ui.PopulateIssueList(issueList, appState, showClosedIssues, showPrefix, indexToIssue)
 	}
 
 	// safeQueueUpdateDraw wraps app.QueueUpdateDraw with timeout protection
@@ -978,6 +981,22 @@ func main() {
 				mouseEnabled = !mouseEnabled
 				app.EnableMouse(mouseEnabled)
 				statusBar.SetText(getStatusBarText())
+				return nil
+			case 'p':
+				// Toggle issue ID prefix display
+				showPrefix = !showPrefix
+				populateIssueList()
+				if showPrefix {
+					statusBar.SetText(successMsg("Prefix: shown"))
+				} else {
+					statusBar.SetText(successMsg("Prefix: hidden"))
+				}
+				// Clear message after 2 seconds
+				time.AfterFunc(2*time.Second, func() {
+					safeQueueUpdateDraw(func() {
+						statusBar.SetText(getStatusBarText())
+					})
+				})
 				return nil
 			case 'a':
 				// Open issue creation dialog

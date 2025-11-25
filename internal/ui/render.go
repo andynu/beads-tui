@@ -15,6 +15,7 @@ func PopulateIssueList(
 	issueList *tview.List,
 	appState *state.State,
 	showClosedIssues bool,
+	showPrefix bool,
 	indexToIssue map[int]*parser.Issue,
 ) {
 	// Clear and rebuild issue list
@@ -36,7 +37,7 @@ func PopulateIssueList(
 		treeNodes := appState.GetTreeNodes()
 		for i, node := range treeNodes {
 			isLast := i == len(treeNodes)-1
-			renderTreeNode(issueList, appState, node, "", isLast, &currentIndex, indexToIssue)
+			renderTreeNode(issueList, appState, node, "", isLast, showPrefix, &currentIndex, indexToIssue)
 		}
 	} else {
 		// List view (original behavior)
@@ -48,7 +49,7 @@ func PopulateIssueList(
 			currentIndex++
 
 			for _, issue := range inProgressIssues {
-				text := formatIssueListItem(issue, "◆")
+				text := formatIssueListItem(issue, "◆", showPrefix)
 				issueList.AddItem(text, "", 0, nil)
 				indexToIssue[currentIndex] = issue
 				currentIndex++
@@ -63,7 +64,7 @@ func PopulateIssueList(
 			currentIndex++
 
 			for _, issue := range readyIssues {
-				text := formatIssueListItem(issue, "●")
+				text := formatIssueListItem(issue, "●", showPrefix)
 				issueList.AddItem(text, "", 0, nil)
 				indexToIssue[currentIndex] = issue
 				currentIndex++
@@ -78,7 +79,7 @@ func PopulateIssueList(
 			currentIndex++
 
 			for _, issue := range blockedIssues {
-				text := formatIssueListItem(issue, "○")
+				text := formatIssueListItem(issue, "○", showPrefix)
 				issueList.AddItem(text, "", 0, nil)
 				indexToIssue[currentIndex] = issue
 				currentIndex++
@@ -94,7 +95,7 @@ func PopulateIssueList(
 				currentIndex++
 
 				for _, issue := range closedIssues {
-					text := formatIssueListItem(issue, "✓")
+					text := formatIssueListItem(issue, "✓", showPrefix)
 					issueList.AddItem(text, "", 0, nil)
 					indexToIssue[currentIndex] = issue
 					currentIndex++
@@ -105,11 +106,12 @@ func PopulateIssueList(
 }
 
 // formatIssueListItem formats a single issue for the list view
-func formatIssueListItem(issue *parser.Issue, statusIcon string) string {
+func formatIssueListItem(issue *parser.Issue, statusIcon string, showPrefix bool) string {
 	priorityColor := formatting.GetPriorityColor(issue.Priority)
 	typeIcon := formatting.GetTypeIcon(issue.IssueType)
+	displayID := formatting.FormatIssueID(issue.ID, showPrefix)
 	text := fmt.Sprintf("  [%s]%s[-] %s %s [P%d] %s",
-		priorityColor, statusIcon, typeIcon, issue.ID, issue.Priority, issue.Title)
+		priorityColor, statusIcon, typeIcon, displayID, issue.Priority, issue.Title)
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {
@@ -134,6 +136,7 @@ func renderTreeNode(
 	node *state.TreeNode,
 	prefix string,
 	isLast bool,
+	showPrefix bool,
 	currentIndex *int,
 	indexToIssue map[int]*parser.Issue,
 ) {
@@ -179,8 +182,9 @@ func renderTreeNode(
 	// Format issue line
 	priorityColor := formatting.GetPriorityColor(issue.Priority)
 	typeIcon := formatting.GetTypeIcon(issue.IssueType)
+	displayID := formatting.FormatIssueID(issue.ID, showPrefix)
 	text := fmt.Sprintf("%s%s[%s]%s[-] %s [%s]%s[-] [P%d] %s",
-		prefix, branch, statusColor, statusIcon, typeIcon, priorityColor, issue.ID, issue.Priority, issue.Title)
+		prefix, branch, statusColor, statusIcon, typeIcon, priorityColor, displayID, issue.Priority, issue.Title)
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {
@@ -203,7 +207,7 @@ func renderTreeNode(
 	for i, child := range node.Children {
 		isLastChild := i == len(node.Children)-1
 		newPrefix := prefix + continuation
-		renderTreeNode(issueList, appState, child, newPrefix, isLastChild, currentIndex, indexToIssue)
+		renderTreeNode(issueList, appState, child, newPrefix, isLastChild, showPrefix, currentIndex, indexToIssue)
 	}
 }
 

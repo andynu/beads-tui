@@ -34,10 +34,11 @@ type AppContext struct {
 	Watcher      *watcher.Watcher
 
 	// UI state
-	IndexToIssue      map[int]*parser.Issue
+	IndexToIssue       map[int]*parser.Issue
 	CurrentDetailIssue *parser.Issue
 	DetailPanelFocused bool
 	ShowClosedIssues   bool
+	ShowPrefix         bool
 	MouseEnabled       bool
 
 	// Vim navigation state
@@ -61,6 +62,7 @@ func New(beadsDir string, sqliteReader *storage.SQLiteReader) *AppContext {
 		SQLiteReader: sqliteReader,
 		State:        state.New(),
 		IndexToIssue: make(map[int]*parser.Issue),
+		ShowPrefix:   true, // Default: show full issue IDs
 		MouseEnabled: true, // Default enabled
 	}
 }
@@ -125,6 +127,7 @@ func (ctx *AppContext) PopulateIssueList() {
 		ctx.IssueList,
 		ctx.State,
 		ctx.ShowClosedIssues,
+		ctx.ShowPrefix,
 		ctx.IndexToIssue,
 	)
 }
