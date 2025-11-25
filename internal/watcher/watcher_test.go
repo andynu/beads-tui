@@ -3,6 +3,7 @@ package watcher
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -59,9 +60,9 @@ func TestWatcherDebounce(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	callCount := 0
+	var callCount int32
 	onChange := func() {
-		callCount++
+		atomic.AddInt32(&callCount, 1)
 	}
 
 	w, err := New(testFile, 100*time.Millisecond, onChange)
@@ -88,8 +89,9 @@ func TestWatcherDebounce(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Should only be called once due to debouncing
-	if callCount != 1 {
-		t.Errorf("Expected 1 call due to debouncing, got %d", callCount)
+	finalCount := atomic.LoadInt32(&callCount)
+	if finalCount != 1 {
+		t.Errorf("Expected 1 call due to debouncing, got %d", finalCount)
 	}
 }
 
