@@ -65,7 +65,10 @@ jobs:
 
       - name: Create release
         env:
-          GH_TOKEN: ${{ github.token }}
+          # GITHUB_TOKEN cannot create releases on non-HEAD commits
+          # Use a PAT stored in RELEASE_TOKEN secret instead
+          # See: https://github.com/orgs/community/discussions/121022
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
             --title "${{ github.ref_name }}" \
