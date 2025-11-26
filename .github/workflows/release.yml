@@ -28,6 +28,4 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          # GITHUB_TOKEN doesn't work for new repos due to GitHub bug #180369
-          # Using PAT stored in RELEASE_TOKEN secret instead
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
