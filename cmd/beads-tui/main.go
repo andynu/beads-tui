@@ -1029,6 +1029,42 @@ func main() {
 					}
 				}
 				return nil
+			case 'O':
+				// Expand all nodes in tree view
+				if appState.GetViewMode() == state.ViewTree {
+					count := appState.ExpandAll()
+					saveCollapseState()
+					populateIssueList()
+					if count > 0 {
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Expanded %d nodes", count)))
+					} else {
+						statusBar.SetText(successMsg("✓ All nodes already expanded"))
+					}
+					time.AfterFunc(2*time.Second, func() {
+						safeQueueUpdateDraw(func() {
+							statusBar.SetText(getStatusBarText())
+						})
+					})
+				}
+				return nil
+			case 'Z':
+				// Collapse all nodes in tree view
+				if appState.GetViewMode() == state.ViewTree {
+					count := appState.CollapseAll()
+					saveCollapseState()
+					populateIssueList()
+					if count > 0 {
+						statusBar.SetText(successMsg(fmt.Sprintf("✓ Collapsed %d nodes", count)))
+					} else {
+						statusBar.SetText(successMsg("✓ All nodes already collapsed"))
+					}
+					time.AfterFunc(2*time.Second, func() {
+						safeQueueUpdateDraw(func() {
+							statusBar.SetText(getStatusBarText())
+						})
+					})
+				}
+				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
 				verticalLayout = !verticalLayout

@@ -429,6 +429,52 @@ func (s *State) SetCollapsedNodes(nodes map[string]bool) {
 	}
 }
 
+// ExpandAll expands all nodes in the tree (clears all collapse state)
+// Returns the number of nodes affected
+func (s *State) ExpandAll() int {
+	count := 0
+	s.expandAllNodes(s.treeNodes, &count)
+	return count
+}
+
+// expandAllNodes recursively sets all nodes with children to expanded
+func (s *State) expandAllNodes(nodes []*TreeNode, count *int) {
+	for _, node := range nodes {
+		if len(node.Children) > 0 {
+			// Only count if it was actually collapsed
+			if s.collapsedNodes[node.Issue.ID] {
+				*count++
+			}
+			// Set explicit expanded state (false = not collapsed)
+			delete(s.collapsedNodes, node.Issue.ID)
+			s.expandAllNodes(node.Children, count)
+		}
+	}
+}
+
+// CollapseAll collapses all parent nodes in the tree
+// Returns the number of nodes affected
+func (s *State) CollapseAll() int {
+	count := 0
+	s.collapseAllNodes(s.treeNodes, &count)
+	return count
+}
+
+// collapseAllNodes recursively sets all nodes with children to collapsed
+func (s *State) collapseAllNodes(nodes []*TreeNode, count *int) {
+	for _, node := range nodes {
+		if len(node.Children) > 0 {
+			// Only count if it wasn't already collapsed
+			if !s.collapsedNodes[node.Issue.ID] {
+				*count++
+			}
+			s.collapsedNodes[node.Issue.ID] = true
+			// Still recurse to collapse nested children
+			s.collapseAllNodes(node.Children, count)
+		}
+	}
+}
+
 // buildDependencyTree constructs a tree structure from issue dependencies
 func (s *State) buildDependencyTree() {
 	s.treeNodes = nil
