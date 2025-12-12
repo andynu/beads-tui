@@ -141,6 +141,8 @@ func renderTreeNode(
 	indexToIssue map[int]*parser.Issue,
 ) {
 	issue := node.Issue
+	hasChildren := len(node.Children) > 0
+	isCollapsed := appState.IsCollapsed(issue.ID)
 
 	// Determine branch characters
 	var branch, continuation string
@@ -179,12 +181,30 @@ func renderTreeNode(
 		statusColor = formatting.GetStatusColor(parser.StatusOpen)
 	}
 
+	// Add collapse indicator for parent nodes
+	collapseIndicator := ""
+	if hasChildren {
+		if isCollapsed {
+			collapseIndicator = "[+] " // Collapsed - can expand
+		} else {
+			collapseIndicator = "[-] " // Expanded - can collapse
+		}
+	} else {
+		collapseIndicator = "    " // Leaf node - no indicator (maintain alignment)
+	}
+
 	// Format issue line
 	priorityColor := formatting.GetPriorityColor(issue.Priority)
 	typeIcon := formatting.GetTypeIcon(issue.IssueType)
 	displayID := formatting.FormatIssueID(issue.ID, showPrefix)
-	text := fmt.Sprintf("%s%s[%s]%s[-] %s [%s]%s[-] [P%d] %s",
-		prefix, branch, statusColor, statusIcon, typeIcon, priorityColor, displayID, issue.Priority, issue.Title)
+	text := fmt.Sprintf("%s%s%s[%s]%s[-] %s [%s]%s[-] [P%d] %s",
+		prefix, branch, collapseIndicator, statusColor, statusIcon, typeIcon, priorityColor, displayID, issue.Priority, issue.Title)
+
+	// Add child count for collapsed nodes
+	if hasChildren && isCollapsed {
+		mutedColor := formatting.GetMutedColor()
+		text += fmt.Sprintf(" [%s](%d children)[-]", mutedColor, len(node.Children))
+	}
 
 	// Add labels if present
 	if len(issue.Labels) > 0 {
@@ -203,11 +223,13 @@ func renderTreeNode(
 	indexToIssue[*currentIndex] = issue
 	*currentIndex++
 
-	// Render children
-	for i, child := range node.Children {
-		isLastChild := i == len(node.Children)-1
-		newPrefix := prefix + continuation
-		renderTreeNode(issueList, appState, child, newPrefix, isLastChild, showPrefix, currentIndex, indexToIssue)
+	// Render children only if not collapsed
+	if !isCollapsed {
+		for i, child := range node.Children {
+			isLastChild := i == len(node.Children)-1
+			newPrefix := prefix + continuation
+			renderTreeNode(issueList, appState, child, newPrefix, isLastChild, showPrefix, currentIndex, indexToIssue)
+		}
 	}
 }
 

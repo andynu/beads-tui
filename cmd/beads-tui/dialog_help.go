@@ -49,6 +49,7 @@ func (h *DialogHelpers) ShowHelpScreen() {
 
 [cyan::b]View Controls[-::-]
   t           Toggle between list and tree view
+  o           Collapse/expand node in tree view (vim-style fold)
   T           Cycle to next theme (live theme switching)
   C           Toggle showing closed issues in list view
   p           Toggle issue ID prefix (tui-abc vs abc)

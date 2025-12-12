@@ -24,6 +24,10 @@ type State struct {
 	// This is set by categorizeIssues() and used by IsEffectivelyBlocked()
 	effectivelyBlocked map[string]bool
 
+	// Tree collapse state - persists across tree rebuilds
+	// Maps issue ID to collapsed state (true = collapsed)
+	collapsedNodes map[string]bool
+
 	// Filter state
 	priorityFilter map[int]bool              // nil = no filter, otherwise only show these priorities
 	typeFilter     map[parser.IssueType]bool // nil = no filter, otherwise only show these types
@@ -56,14 +60,17 @@ type TreeNode struct {
 	Issue    *parser.Issue
 	Children []*TreeNode
 	Depth    int
+	// Note: Collapsed state is tracked in State.collapsedNodes map, not here
+	// This keeps TreeNode purely representational and allows state persistence
 }
 
 // New creates a new application state
 func New() *State {
 	return &State{
-		issuesByID: make(map[string]*parser.Issue),
-		filterMode: FilterAll,
-		viewMode:   ViewList,
+		issuesByID:     make(map[string]*parser.Issue),
+		filterMode:     FilterAll,
+		viewMode:       ViewList,
+		collapsedNodes: make(map[string]bool),
 	}
 }
 
@@ -298,6 +305,51 @@ func (s *State) ToggleViewMode() ViewMode {
 // GetTreeNodes returns the tree structure for tree view
 func (s *State) GetTreeNodes() []*TreeNode {
 	return s.treeNodes
+}
+
+// IsCollapsed returns true if the given issue is collapsed in tree view
+func (s *State) IsCollapsed(issueID string) bool {
+	return s.collapsedNodes[issueID]
+}
+
+// ToggleCollapse toggles the collapse state for an issue and returns the new state
+func (s *State) ToggleCollapse(issueID string) bool {
+	s.collapsedNodes[issueID] = !s.collapsedNodes[issueID]
+	return s.collapsedNodes[issueID]
+}
+
+// SetCollapsed sets the collapse state for an issue
+func (s *State) SetCollapsed(issueID string, collapsed bool) {
+	if collapsed {
+		s.collapsedNodes[issueID] = true
+	} else {
+		delete(s.collapsedNodes, issueID)
+	}
+}
+
+// HasChildren returns true if the issue has children in the tree
+// This is useful to know whether the collapse toggle is meaningful
+func (s *State) HasChildren(issueID string) bool {
+	// Search in tree nodes recursively for this issue
+	for _, node := range s.treeNodes {
+		if found := s.findNodeWithChildren(node, issueID); found {
+			return true
+		}
+	}
+	return false
+}
+
+// findNodeWithChildren recursively searches for an issue and returns true if it has children
+func (s *State) findNodeWithChildren(node *TreeNode, issueID string) bool {
+	if node.Issue.ID == issueID {
+		return len(node.Children) > 0
+	}
+	for _, child := range node.Children {
+		if found := s.findNodeWithChildren(child, issueID); found {
+			return true
+		}
+	}
+	return false
 }
 
 // buildDependencyTree constructs a tree structure from issue dependencies

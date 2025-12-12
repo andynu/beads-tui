@@ -966,6 +966,42 @@ func main() {
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
 				return nil
+			case 'o':
+				// Toggle collapse for selected issue in tree view (vim-style fold)
+				if appState.GetViewMode() == state.ViewTree {
+					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
+						if appState.HasChildren(issue.ID) {
+							isCollapsed := appState.ToggleCollapse(issue.ID)
+							populateIssueList()
+							// Restore selection after repopulating
+							for idx, iss := range indexToIssue {
+								if iss.ID == issue.ID {
+									issueList.SetCurrentItem(idx)
+									break
+								}
+							}
+							if isCollapsed {
+								statusBar.SetText(successMsg(fmt.Sprintf("✓ Collapsed %s", issue.ID)))
+							} else {
+								statusBar.SetText(successMsg(fmt.Sprintf("✓ Expanded %s", issue.ID)))
+							}
+							// Clear message after 2 seconds
+							time.AfterFunc(2*time.Second, func() {
+								safeQueueUpdateDraw(func() {
+									statusBar.SetText(getStatusBarText())
+								})
+							})
+						} else {
+							statusBar.SetText(errorMsg("No children to collapse"))
+							time.AfterFunc(2*time.Second, func() {
+								safeQueueUpdateDraw(func() {
+									statusBar.SetText(getStatusBarText())
+								})
+							})
+						}
+					}
+				}
+				return nil
 			case 'v':
 				// Toggle layout orientation (horizontal/vertical)
 				verticalLayout = !verticalLayout
