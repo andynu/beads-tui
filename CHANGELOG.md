@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `[+]` indicator for collapsed nodes with child count
   - `[-]` indicator for expanded nodes
   - Leaf nodes maintain visual alignment
+- **Expand/collapse all** - Bulk operations for tree nodes
+  - `O` (Shift-O) - Expand all nodes
+  - `Z` (Shift-Z) - Collapse all nodes
 - **Smart collapse defaults** - Nodes auto-collapse/expand based on activity:
   - Auto-expand nodes with active work (any child is `in_progress`)
   - Auto-collapse nodes without active work (all children closed or pending)
