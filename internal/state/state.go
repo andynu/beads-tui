@@ -441,12 +441,12 @@ func (s *State) ExpandAll() int {
 func (s *State) expandAllNodes(nodes []*TreeNode, count *int) {
 	for _, node := range nodes {
 		if len(node.Children) > 0 {
-			// Only count if it was actually collapsed
-			if s.collapsedNodes[node.Issue.ID] {
+			// Only count if it was actually collapsed (explicit or smart default)
+			if s.IsCollapsed(node.Issue.ID) {
 				*count++
 			}
-			// Set explicit expanded state (false = not collapsed)
-			delete(s.collapsedNodes, node.Issue.ID)
+			// Set explicit expanded state (false overrides smart defaults)
+			s.collapsedNodes[node.Issue.ID] = false
 			s.expandAllNodes(node.Children, count)
 		}
 	}
@@ -464,8 +464,8 @@ func (s *State) CollapseAll() int {
 func (s *State) collapseAllNodes(nodes []*TreeNode, count *int) {
 	for _, node := range nodes {
 		if len(node.Children) > 0 {
-			// Only count if it wasn't already collapsed
-			if !s.collapsedNodes[node.Issue.ID] {
+			// Only count if it wasn't already collapsed (explicit or smart default)
+			if !s.IsCollapsed(node.Issue.ID) {
 				*count++
 			}
 			s.collapsedNodes[node.Issue.ID] = true
