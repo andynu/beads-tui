@@ -199,12 +199,16 @@ func main() {
 		return fmt.Sprintf("[%s]%s[-]", formatting.GetEmphasisColor(), msg)
 	}
 
+	// Helper function to generate issue list title with view mode indicator
+	getIssueListTitle := func() string {
+		if appState.GetViewMode() == state.ViewTree {
+			return "Issues [Tree] (t:List)"
+		}
+		return "Issues [List] (t:Tree)"
+	}
+
 	// Helper function to generate status bar text
 	getStatusBarText := func() string {
-		viewModeStr := "List"
-		if appState.GetViewMode() == state.ViewTree {
-			viewModeStr = "Tree"
-		}
 		mouseStr := "OFF"
 		if mouseEnabled {
 			mouseStr = "ON"
@@ -236,8 +240,8 @@ func main() {
 		}
 
 		emphasisColor := formatting.GetEmphasisColor()
-		return fmt.Sprintf("[%s]Beads TUI[-] - %s (%d issues)%s%s [SQLite] [%s View] [%s] [Mouse: %s] [Focus: %s] [Press ? for help, v to toggle layout]",
-			emphasisColor, beadsDir, visibleCount, filterText, closedText, viewModeStr, layoutStr, mouseStr, focusStr)
+		return fmt.Sprintf("[%s]Beads TUI[-] - %s (%d issues)%s%s [%s] [Mouse: %s] [Focus: %s] [? help | v layout]",
+			emphasisColor, beadsDir, visibleCount, filterText, closedText, layoutStr, mouseStr, focusStr)
 	}
 
 	// Helper function to populate issue list from state
@@ -462,13 +466,13 @@ func main() {
 	updatePanelFocus := func() {
 		if detailPanelFocused {
 			issueList.SetBorderColor(tcell.ColorGray)
-			issueList.SetTitle("Issues")
+			issueList.SetTitle(getIssueListTitle())
 			detailPanel.SetBorderColor(tcell.ColorYellow)
 			detailPanel.SetTitle("Details [FOCUSED - Use Ctrl-d/u to scroll, ESC to return]")
 			app.SetFocus(detailPanel)
 		} else {
 			issueList.SetBorderColor(tcell.ColorDefault)
-			issueList.SetTitle("Issues")
+			issueList.SetTitle(getIssueListTitle())
 			detailPanel.SetBorderColor(tcell.ColorGray)
 			detailPanel.SetTitle("Details [Press Tab or Enter to focus]")
 			app.SetFocus(issueList)
@@ -958,6 +962,7 @@ func main() {
 			case 't':
 				// Toggle view mode
 				appState.ToggleViewMode()
+				issueList.SetTitle(getIssueListTitle())
 				statusBar.SetText(getStatusBarText())
 				populateIssueList()
 				return nil
