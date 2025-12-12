@@ -308,13 +308,17 @@ func (s *State) GetTreeNodes() []*TreeNode {
 }
 
 // IsCollapsed returns true if the given issue is collapsed in tree view
+// Uses smart defaults (collapse if no active work in subtree) when no explicit state is set
 func (s *State) IsCollapsed(issueID string) bool {
-	return s.collapsedNodes[issueID]
+	collapsed, _ := s.GetCollapseState(issueID)
+	return collapsed
 }
 
 // ToggleCollapse toggles the collapse state for an issue and returns the new state
+// Takes into account smart defaults when toggling for the first time
 func (s *State) ToggleCollapse(issueID string) bool {
-	s.collapsedNodes[issueID] = !s.collapsedNodes[issueID]
+	currentState := s.IsCollapsed(issueID) // Gets smart default if not explicitly set
+	s.collapsedNodes[issueID] = !currentState
 	return s.collapsedNodes[issueID]
 }
 
@@ -350,6 +354,79 @@ func (s *State) findNodeWithChildren(node *TreeNode, issueID string) bool {
 		}
 	}
 	return false
+}
+
+// SubtreeHasActiveWork returns true if any issue in the subtree (children) is in_progress
+// This is used for smart collapse defaults - expand nodes with active work
+func (s *State) SubtreeHasActiveWork(issueID string) bool {
+	for _, node := range s.treeNodes {
+		if found, hasActive := s.findNodeAndCheckActive(node, issueID); found {
+			return hasActive
+		}
+	}
+	return false
+}
+
+// findNodeAndCheckActive finds a node by ID and checks if its subtree has active work
+// Returns (found, hasActiveWork)
+func (s *State) findNodeAndCheckActive(node *TreeNode, issueID string) (bool, bool) {
+	if node.Issue.ID == issueID {
+		return true, s.subtreeHasActiveWork(node)
+	}
+	for _, child := range node.Children {
+		if found, hasActive := s.findNodeAndCheckActive(child, issueID); found {
+			return found, hasActive
+		}
+	}
+	return false, false
+}
+
+// subtreeHasActiveWork checks if the node or any of its descendants are in_progress
+func (s *State) subtreeHasActiveWork(node *TreeNode) bool {
+	// Check children only (not the node itself - we want to know about subtree)
+	for _, child := range node.Children {
+		if child.Issue.Status == parser.StatusInProgress {
+			return true
+		}
+		if s.subtreeHasActiveWork(child) {
+			return true
+		}
+	}
+	return false
+}
+
+// ShouldDefaultCollapse returns whether a node should be collapsed by default
+// (when no explicit user preference is set)
+// Logic: collapse if subtree has NO active work, expand if it does
+func (s *State) ShouldDefaultCollapse(issueID string) bool {
+	return !s.SubtreeHasActiveWork(issueID)
+}
+
+// GetCollapseState returns the collapse state for an issue, using smart defaults
+// if no explicit state has been set. Returns (isCollapsed, isExplicitlySet)
+func (s *State) GetCollapseState(issueID string) (bool, bool) {
+	if collapsed, exists := s.collapsedNodes[issueID]; exists {
+		return collapsed, true
+	}
+	// No explicit state - use smart default
+	return s.ShouldDefaultCollapse(issueID), false
+}
+
+// GetCollapsedNodes returns a copy of the collapsed nodes map for persistence
+func (s *State) GetCollapsedNodes() map[string]bool {
+	result := make(map[string]bool)
+	for k, v := range s.collapsedNodes {
+		result[k] = v
+	}
+	return result
+}
+
+// SetCollapsedNodes sets the collapsed nodes map (for loading from persistence)
+func (s *State) SetCollapsedNodes(nodes map[string]bool) {
+	s.collapsedNodes = make(map[string]bool)
+	for k, v := range nodes {
+		s.collapsedNodes[k] = v
+	}
 }
 
 // buildDependencyTree constructs a tree structure from issue dependencies

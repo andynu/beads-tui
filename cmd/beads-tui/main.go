@@ -378,6 +378,27 @@ func main() {
 	}
 	appState.LoadIssues(issues)
 
+	// Load collapse state from disk (persisted between sessions)
+	collapseState, err := config.LoadCollapseState(beadsDir)
+	if err != nil {
+		log.Printf("Warning: failed to load collapse state: %v", err)
+	} else {
+		appState.SetCollapsedNodes(collapseState.CollapsedNodes)
+		log.Printf("Loaded collapse state: %d nodes", len(collapseState.CollapsedNodes))
+	}
+
+	// Helper function to save collapse state (called on toggle and exit)
+	saveCollapseState := func() {
+		state := &config.CollapseState{
+			CollapsedNodes: appState.GetCollapsedNodes(),
+		}
+		if err := config.SaveCollapseState(beadsDir, state); err != nil {
+			log.Printf("Warning: failed to save collapse state: %v", err)
+		} else {
+			log.Printf("Saved collapse state: %d nodes", len(state.CollapsedNodes))
+		}
+	}
+
 	// Filter by issue ID if specified
 	if *issueID != "" {
 		filtered := make([]*parser.Issue, 0)
@@ -543,6 +564,9 @@ func main() {
 		for sig := range sigChan {
 			shutdownOnce.Do(func() {
 				log.Printf("SIGNAL: Received signal %v, initiating graceful shutdown", sig)
+
+				// Save collapse state before exit
+				saveCollapseState()
 
 				// Stop the TUI application
 				app.Stop()
@@ -802,6 +826,7 @@ func main() {
 			now := time.Now()
 			if !lastEscapeTime.IsZero() && now.Sub(lastEscapeTime) < time.Second {
 				// Second ESC within 1 second - quit
+				saveCollapseState() // Persist before exit
 				app.Stop()
 				return nil
 			}
@@ -918,6 +943,7 @@ func main() {
 			// Normal single-key handling
 			switch event.Rune() {
 			case 'q':
+				saveCollapseState() // Persist before exit
 				app.Stop()
 				return nil
 			case 'r':
@@ -972,6 +998,7 @@ func main() {
 					if issue, ok := indexToIssue[issueList.GetCurrentItem()]; ok {
 						if appState.HasChildren(issue.ID) {
 							isCollapsed := appState.ToggleCollapse(issue.ID)
+							saveCollapseState() // Persist to disk
 							populateIssueList()
 							// Restore selection after repopulating
 							for idx, iss := range indexToIssue {
