@@ -5,6 +5,27 @@ All notable changes to beads-tui will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-12-12
+
+### Added
+
+#### Tree View Enhancements
+- **Collapsible nodes** (`o`) - Collapse/expand parent nodes in tree view (vim-style fold)
+  - `[+]` indicator for collapsed nodes with child count
+  - `[-]` indicator for expanded nodes
+  - Leaf nodes maintain visual alignment
+- **Smart collapse defaults** - Nodes auto-collapse/expand based on activity:
+  - Auto-expand nodes with active work (any child is `in_progress`)
+  - Auto-collapse nodes without active work (all children closed or pending)
+  - Manual toggles override smart defaults
+- **Collapse state persistence** - Remember collapse preferences between sessions
+  - Saved to `~/.beads-tui/collapse-<hash>.json` (per-project)
+  - Loads on startup, saves on toggle and exit
+
+#### UI Improvements
+- **View mode hint in panel title** - Shows current view mode (e.g., "Issues [List] (t:Tree)")
+- Cleaner status bar (removed redundant view mode indicator)
+
 ## [0.1.0] - 2025-11-25
 
 Initial release of beads-tui, a terminal user interface for the [beads](https://github.com/steveyegge/beads) issue tracker.
@@ -81,4 +102,5 @@ Initial release of beads-tui, a terminal user interface for the [beads](https://
 - SQLite database access via [go-sqlite3](https://github.com/ncruces/go-sqlite3)
 - Cross-platform: macOS (Intel/Apple Silicon) and Linux (amd64/arm64)
 
-[0.1.0]: https://github.com/andy/beads-tui/releases/tag/v0.1.0
+[0.2.0]: https://github.com/andynu/beads-tui/releases/tag/v0.2.0
+[0.1.0]: https://github.com/andynu/beads-tui/releases/tag/v0.1.0
