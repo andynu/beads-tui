@@ -22,12 +22,8 @@ func (h *DialogHelpers) ShowCommentDialog() {
 	form := tview.NewForm()
 	var commentText string
 
-	form.AddTextView("Adding comment to", issue.ID+" - "+issue.Title, 0, 2, false, false)
-	form.AddTextArea("Comment", "", 60, 8, 0, func(text string) {
-		commentText = text
-	})
-
-	form.AddButton("Save (Ctrl-S)", func() {
+	// Define save function to be used by both button and Ctrl-S
+	saveComment := func() {
 		if commentText == "" {
 			h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Comment cannot be empty[-]", formatting.GetErrorColor()))
 			return
@@ -51,7 +47,26 @@ func (h *DialogHelpers) ShowCommentDialog() {
 			issueID := issue.ID
 			h.ScheduleRefresh(issueID)
 		}
+	}
+
+	form.AddTextView("Adding comment to", issue.ID+" - "+issue.Title, 0, 2, false, false)
+	form.AddTextArea("Comment", "", 60, 8, 0, func(text string) {
+		commentText = text
 	})
+
+	// Get the TextArea and add Ctrl-S handler directly to it
+	// (form's InputCapture doesn't receive events when TextArea has focus)
+	if textArea, ok := form.GetFormItemByLabel("Comment").(*tview.TextArea); ok {
+		textArea.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlS {
+				saveComment()
+				return nil
+			}
+			return event
+		})
+	}
+
+	form.AddButton("Save (Ctrl-S)", saveComment)
 	form.AddButton("Cancel", func() {
 		h.Pages.RemovePage("comment_dialog")
 		h.App.SetFocus(h.IssueList)
@@ -63,28 +78,10 @@ func (h *DialogHelpers) ShowCommentDialog() {
 		h.App.SetFocus(h.IssueList)
 	})
 
-	// Add Ctrl-S handler for save
+	// Add Ctrl-S handler for when buttons have focus
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyCtrlS {
-			// Save comment directly
-			if commentText == "" {
-				h.StatusBar.SetText(fmt.Sprintf("[%s]Error: Comment cannot be empty[-]", formatting.GetErrorColor()))
-				return nil
-			}
-
-			log.Printf("BD COMMAND: Adding comment: bd comment %s %q", issue.ID, commentText)
-			comment, err := execBdJSONComment("comment", issue.ID, commentText)
-			if err != nil {
-				log.Printf("BD COMMAND ERROR: Comment failed: %v", err)
-				h.StatusBar.SetText(fmt.Sprintf("[%s]Error adding comment: %v[-]", formatting.GetErrorColor(), err))
-			} else {
-				log.Printf("BD COMMAND: Comment added successfully: ID %d", comment.ID)
-				h.StatusBar.SetText(fmt.Sprintf("[%s]✓ Comment added successfully[-]", formatting.GetSuccessColor()))
-				h.Pages.RemovePage("comment_dialog")
-				h.App.SetFocus(h.IssueList)
-				issueID := issue.ID
-				h.ScheduleRefresh(issueID)
-			}
+			saveComment()
 			return nil
 		}
 		return event

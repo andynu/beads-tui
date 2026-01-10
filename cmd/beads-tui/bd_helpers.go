@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,9 +45,14 @@ func execBdJSON(args ...string) (*BdCommandResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Execute command with timeout
+	// Execute command with timeout, capturing stdout and stderr separately
+	// This is important because bd may write warnings to stderr (e.g., deprecation
+	// warnings, daemon warnings) which would corrupt the JSON output if combined
 	cmd := exec.CommandContext(ctx, "bd", args...)
-	output, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 
 	// Check for timeout error specifically
 	if ctx.Err() == context.DeadlineExceeded {
@@ -55,24 +61,27 @@ func execBdJSON(args ...string) (*BdCommandResult, error) {
 	}
 
 	if err != nil {
-		// Try to parse error from JSON output first
+		// Try to parse error from JSON output first (check stdout)
 		var result BdCommandResult
-		if jsonErr := json.Unmarshal(output, &result); jsonErr == nil && result.Error != "" {
+		if jsonErr := json.Unmarshal(stdout.Bytes(), &result); jsonErr == nil && result.Error != "" {
 			return nil, fmt.Errorf("bd %s failed: %s", args[0], result.Error)
 		}
-		// Fall back to original error with output
-		outputStr := strings.TrimSpace(string(output))
-		if outputStr == "" {
+		// Fall back to stderr, then stdout
+		errOutput := strings.TrimSpace(stderr.String())
+		if errOutput == "" {
+			errOutput = strings.TrimSpace(stdout.String())
+		}
+		if errOutput == "" {
 			return nil, fmt.Errorf("bd %s command failed: %v", args[0], err)
 		}
-		return nil, fmt.Errorf("bd %s failed: %s", args[0], outputStr)
+		return nil, fmt.Errorf("bd %s failed: %s", args[0], errOutput)
 	}
 
-	// Parse JSON response
-	result, parseErr := parseBdJSON(output)
+	// Parse JSON response from stdout only
+	result, parseErr := parseBdJSON(stdout.Bytes())
 	if parseErr != nil {
 		// Provide helpful error with snippet of output
-		outputPreview := string(output)
+		outputPreview := stdout.String()
 		if len(outputPreview) > 200 {
 			outputPreview = outputPreview[:200] + "..."
 		}

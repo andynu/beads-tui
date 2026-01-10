@@ -14,6 +14,11 @@ bd.sock
 db.sqlite
 bd.db
 
+# Local state files
+.local_version
+last-touched
+sync-state.json
+
 # Keep JSONL exports and config (source of truth for git)
 !*.jsonl
 !metadata.json
