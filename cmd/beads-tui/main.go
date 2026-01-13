@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -117,6 +118,14 @@ func main() {
 	// Open SQLite database in read-only mode
 	sqliteReader, err := storage.NewSQLiteReader(dbPath)
 	if err != nil {
+		if errors.Is(err, storage.ErrDatabaseCorrupted) {
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Error: Database is corrupted!")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "The beads database has been damaged. Run 'bd doctor --fix' to recover from backup.")
+			fmt.Fprintln(os.Stderr, "")
+			os.Exit(1)
+		}
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		os.Exit(1)
 	}
@@ -330,9 +339,15 @@ func main() {
 		issues, err := sqliteReader.LoadIssues(ctx)
 		if err != nil {
 			log.Printf("REFRESH ERROR: Failed to load issues: %v", err)
-			// Show error in status bar
+			// Show error in status bar with helpful message for corruption
+			var errText string
+			if errors.Is(err, storage.ErrDatabaseCorrupted) {
+				errText = "Database corrupted! Run 'bd doctor --fix' to recover."
+			} else {
+				errText = fmt.Sprintf("Error loading issues: %v", err)
+			}
 			safeQueueUpdateDraw(func() {
-				statusBar.SetText(errorMsg(fmt.Sprintf("Error loading issues: %v", err)))
+				statusBar.SetText(errorMsg(errText))
 			})
 			return
 		}
@@ -373,6 +388,14 @@ func main() {
 	issues, err := sqliteReader.LoadIssues(ctx)
 	cancel()
 	if err != nil {
+		if errors.Is(err, storage.ErrDatabaseCorrupted) {
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Error: Database is corrupted!")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "The beads database has been damaged. Run 'bd doctor --fix' to recover from backup.")
+			fmt.Fprintln(os.Stderr, "")
+			os.Exit(1)
+		}
 		fmt.Fprintf(os.Stderr, "Error loading issues: %v\n", err)
 		os.Exit(1)
 	}

@@ -3,14 +3,34 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/andy/beads-tui/internal/parser"
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 )
+
+// ErrDatabaseCorrupted indicates the SQLite database is corrupted and needs repair.
+// Users should run 'bd doctor --fix' to recover from backup.
+var ErrDatabaseCorrupted = errors.New("database is corrupted")
+
+// isCorruptionError checks if an error message indicates SQLite database corruption
+func isCorruptionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	// Common SQLite corruption error patterns
+	return strings.Contains(msg, "database disk image is malformed") ||
+		strings.Contains(msg, "database corruption") ||
+		strings.Contains(msg, "file is not a database") ||
+		strings.Contains(msg, "database or disk is full") ||
+		strings.Contains(msg, "unable to open database file")
+}
 
 // SQLiteReader reads issues directly from .beads/beads.db
 type SQLiteReader struct {
@@ -27,6 +47,9 @@ func NewSQLiteReader(dbPath string) (*SQLiteReader, error) {
 	// ncruces/go-sqlite3 requires file: prefix for proper WAL support
 	db, err := sql.Open("sqlite3", "file:"+dbPath+"?mode=ro")
 	if err != nil {
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
@@ -41,6 +64,9 @@ func NewSQLiteReader(dbPath string) (*SQLiteReader, error) {
 
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -49,6 +75,9 @@ func NewSQLiteReader(dbPath string) (*SQLiteReader, error) {
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'").Scan(&tableCount)
 	if err != nil {
 		db.Close()
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("failed to verify schema: %w", err)
 	}
 	if tableCount == 0 {
@@ -142,14 +171,21 @@ func (r *SQLiteReader) reconnect(ctx context.Context) error {
 // LoadIssues reads all issues from the database with dependencies, labels, and comments
 // Uses read-only transaction to ensure consistent snapshot
 // Includes health check and automatic reconnection on stale connections
+// Returns ErrDatabaseCorrupted if the database is corrupted.
 func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) {
 	// Health check before reading
 	if err := r.healthCheck(ctx); err != nil {
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("database health check failed: %w", err)
 	}
 	// Begin read-only transaction for consistent snapshot
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // Safe to call even after commit
@@ -163,6 +199,9 @@ func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) 
 		ORDER BY created_at DESC
 	`)
 	if err != nil {
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("failed to query issues: %w", err)
 	}
 	defer rows.Close()
@@ -182,6 +221,9 @@ func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) 
 			&issue.CreatedAt, &issue.UpdatedAt, &closedAt, &externalRef,
 		)
 		if err != nil {
+			if isCorruptionError(err) {
+				return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+			}
 			return nil, fmt.Errorf("failed to scan issue: %w", err)
 		}
 
@@ -204,6 +246,9 @@ func (r *SQLiteReader) LoadIssues(ctx context.Context) ([]*parser.Issue, error) 
 	}
 
 	if err := rows.Err(); err != nil {
+		if isCorruptionError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseCorrupted, err)
+		}
 		return nil, fmt.Errorf("error iterating issues: %w", err)
 	}
 

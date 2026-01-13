@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -518,5 +519,103 @@ func TestClose_NilDB(t *testing.T) {
 	reader := &SQLiteReader{db: nil}
 	if err := reader.Close(); err != nil {
 		t.Errorf("Close with nil db failed: %v", err)
+	}
+}
+
+func TestIsCorruptionError(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "malformed error",
+			errMsg:   "sqlite3: database disk image is malformed",
+			expected: true,
+		},
+		{
+			name:     "corruption error",
+			errMsg:   "database corruption detected",
+			expected: true,
+		},
+		{
+			name:     "not a database error",
+			errMsg:   "file is not a database",
+			expected: true,
+		},
+		{
+			name:     "disk full error",
+			errMsg:   "database or disk is full",
+			expected: true,
+		},
+		{
+			name:     "unable to open error",
+			errMsg:   "unable to open database file",
+			expected: true,
+		},
+		{
+			name:     "normal error",
+			errMsg:   "failed to execute query",
+			expected: false,
+		},
+		{
+			name:     "connection error",
+			errMsg:   "connection refused",
+			expected: false,
+		},
+		{
+			name:     "nil error",
+			errMsg:   "",
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var err error
+			if tc.errMsg != "" {
+				err = &testError{msg: tc.errMsg}
+			}
+			result := isCorruptionError(err)
+			if result != tc.expected {
+				t.Errorf("isCorruptionError(%q) = %v, expected %v", tc.errMsg, result, tc.expected)
+			}
+		})
+	}
+}
+
+// testError is a simple error type for testing
+type testError struct {
+	msg string
+}
+
+func (e *testError) Error() string {
+	return e.msg
+}
+
+func TestNewSQLiteReader_CorruptedDatabase(t *testing.T) {
+	// Create a temp directory
+	tmpDir, err := os.MkdirTemp("", "beads-tui-test-corrupt-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "corrupt.db")
+
+	// Create a file with garbage data (not a valid SQLite database)
+	if err := os.WriteFile(dbPath, []byte("This is not a valid SQLite database file"), 0644); err != nil {
+		t.Fatalf("failed to write corrupt file: %v", err)
+	}
+
+	// Try to open with SQLiteReader - should detect corruption
+	_, err = NewSQLiteReader(dbPath)
+	if err == nil {
+		t.Fatal("Expected error for corrupted database")
+	}
+
+	// Should return ErrDatabaseCorrupted
+	if !errors.Is(err, ErrDatabaseCorrupted) {
+		t.Errorf("Expected ErrDatabaseCorrupted, got: %v", err)
 	}
 }
