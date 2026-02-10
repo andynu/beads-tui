@@ -300,6 +300,17 @@ func main() {
 		}
 	}
 
+	// showTemporaryStatus displays a message in the status bar that auto-clears
+	// after the given duration, reverting to the default status bar text.
+	showTemporaryStatus := func(msg string, duration time.Duration) {
+		statusBar.SetText(msg)
+		time.AfterFunc(duration, func() {
+			safeQueueUpdateDraw(func() {
+				statusBar.SetText(getStatusBarText())
+			})
+		})
+	}
+
 	// Mutex to serialize refresh operations
 	var refreshMutex sync.Mutex
 
@@ -518,13 +529,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 				} else {
 					log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", currentDetailIssue.ID)
-					statusBar.SetText(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID))
-					// Clear message after 2 seconds
-					time.AfterFunc(2*time.Second, func() {
-						safeQueueUpdateDraw(func() {
-							statusBar.SetText(getStatusBarText())
-						})
-					})
+					showTemporaryStatus(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID), 2*time.Second)
 				}
 			}
 		}
@@ -1054,23 +1059,12 @@ func main() {
 								}
 							}
 							if isCollapsed {
-								statusBar.SetText(successMsg(fmt.Sprintf("✓ Collapsed %s", issue.ID)))
+								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %s", issue.ID)), 2*time.Second)
 							} else {
-								statusBar.SetText(successMsg(fmt.Sprintf("✓ Expanded %s", issue.ID)))
+								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %s", issue.ID)), 2*time.Second)
 							}
-							// Clear message after 2 seconds
-							time.AfterFunc(2*time.Second, func() {
-								safeQueueUpdateDraw(func() {
-									statusBar.SetText(getStatusBarText())
-								})
-							})
 						} else {
-							statusBar.SetText(errorMsg("No children to collapse"))
-							time.AfterFunc(2*time.Second, func() {
-								safeQueueUpdateDraw(func() {
-									statusBar.SetText(getStatusBarText())
-								})
-							})
+							showTemporaryStatus(errorMsg("No children to collapse"), 2*time.Second)
 						}
 					}
 				}
@@ -1082,15 +1076,10 @@ func main() {
 					saveCollapseState()
 					populateIssueList()
 					if count > 0 {
-						statusBar.SetText(successMsg(fmt.Sprintf("✓ Expanded %d nodes", count)))
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %d nodes", count)), 2*time.Second)
 					} else {
-						statusBar.SetText(successMsg("✓ All nodes already expanded"))
+						showTemporaryStatus(successMsg("✓ All nodes already expanded"), 2*time.Second)
 					}
-					time.AfterFunc(2*time.Second, func() {
-						safeQueueUpdateDraw(func() {
-							statusBar.SetText(getStatusBarText())
-						})
-					})
 				}
 				return nil
 			case 'Z':
@@ -1100,15 +1089,10 @@ func main() {
 					saveCollapseState()
 					populateIssueList()
 					if count > 0 {
-						statusBar.SetText(successMsg(fmt.Sprintf("✓ Collapsed %d nodes", count)))
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %d nodes", count)), 2*time.Second)
 					} else {
-						statusBar.SetText(successMsg("✓ All nodes already collapsed"))
+						showTemporaryStatus(successMsg("✓ All nodes already collapsed"), 2*time.Second)
 					}
-					time.AfterFunc(2*time.Second, func() {
-						safeQueueUpdateDraw(func() {
-							statusBar.SetText(getStatusBarText())
-						})
-					})
 				}
 				return nil
 			case 'v':
@@ -1137,16 +1121,10 @@ func main() {
 				showPrefix = !showPrefix
 				populateIssueList()
 				if showPrefix {
-					statusBar.SetText(successMsg("Prefix: shown"))
+					showTemporaryStatus(successMsg("Prefix: shown"), 2*time.Second)
 				} else {
-					statusBar.SetText(successMsg("Prefix: hidden"))
+					showTemporaryStatus(successMsg("Prefix: hidden"), 2*time.Second)
 				}
-				// Clear message after 2 seconds
-				time.AfterFunc(2*time.Second, func() {
-					safeQueueUpdateDraw(func() {
-						statusBar.SetText(getStatusBarText())
-					})
-				})
 				return nil
 			case 'a':
 				// Open issue creation dialog
@@ -1173,13 +1151,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", issue.ID)
-						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)))
-						// Clear message after 2 seconds
-						time.AfterFunc(2*time.Second, func() {
-							safeQueueUpdateDraw(func() {
-								statusBar.SetText(getStatusBarText())
-							})
-						})
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)), 2*time.Second)
 					}
 				}
 				return nil
@@ -1193,13 +1165,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID with title to clipboard: %s", text)
-						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)))
-						// Clear message after 2 seconds
-						time.AfterFunc(2*time.Second, func() {
-							safeQueueUpdateDraw(func() {
-								statusBar.SetText(getStatusBarText())
-							})
-						})
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)), 2*time.Second)
 					}
 				}
 				return nil
@@ -1213,13 +1179,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied branch name to clipboard: %s", branchName)
-						statusBar.SetText(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)))
-						// Clear message after 2 seconds
-						time.AfterFunc(2*time.Second, func() {
-							safeQueueUpdateDraw(func() {
-								statusBar.SetText(getStatusBarText())
-							})
-						})
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)), 2*time.Second)
 					}
 				}
 				return nil
