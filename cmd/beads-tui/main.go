@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -105,6 +106,12 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("Found .beads directory: %s", beadsDir)
+
+	// Warn if bd CLI is not available (issue updates won't work)
+	if _, err := exec.LookPath("bd"); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: 'bd' command not found in PATH. Issue updates will not work.\n")
+		fmt.Fprintf(os.Stderr, "Install beads or add 'bd' to your PATH to enable editing.\n\n")
+	}
 
 	dbPath := filepath.Join(beadsDir, "beads.db")
 
