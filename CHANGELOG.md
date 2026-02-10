@@ -5,6 +5,26 @@ All notable changes to beads-tui will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-10
+
+### Fixed
+- **ESC in detail panel** no longer hides the pane — it returns focus to the issue list, matching the symmetric Tab-in/ESC-out expectation
+- **Tree view indentation** — collapse indicator `[-]` was being eaten by tview's color parser, causing misaligned tree branches. Replaced with unicode triangles (▶/▼)
+- **O(n²) parent detection** in tree builder replaced with O(n) map-based lookup, preventing slowdowns with large issue counts
+
+### Added
+- **Position indicator** in issue list title (e.g., "Issues [List] 3/42") updates on navigation
+- **Empty state guidance** — shows "Press 'a' to create an issue" when list is empty, or "Press 'f' to modify filters" when filters produce zero results
+- **Quick Start section** at top of help screen with the 6 essential keys for new users
+- **Filter active banner** — prominent "⊘ FILTERED" indicator at top of issue list when filters are active
+- **Startup check for bd CLI** — warns if `bd` is not in PATH so users know issue updates won't work
+- **Max recursion depth** (50) in tree builder to prevent stack overflow with pathological dependency chains
+
+### Changed
+- Extracted `showTemporaryStatus` helper, replacing 9 repeated timer patterns (-40 lines)
+- Replaced magic duration values with named constants (`statusMessageDuration`, `refreshDelay`, `queueUpdateTimeout`, `dbLoadTimeout`, `watcherDebounce`)
+- Tree view collapse indicators changed from `[+]`/`[-]` to ▶/▼
+
 ## [0.2.1] - 2026-01-10
 
 ### Fixed
