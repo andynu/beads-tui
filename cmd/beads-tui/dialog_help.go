@@ -11,6 +11,14 @@ func (h *DialogHelpers) ShowHelpScreen() {
 	// showing the current theme's colors as examples
 	helpText := `[yellow::b]beads-tui Keyboard Shortcuts[-::-]
 
+[green::b]Quick Start[-::-]
+  j / k         Navigate up/down (or use arrow keys)
+  Enter         View issue details
+  a             Create new issue
+  /             Search issues
+  ?             This help screen
+  q             Quit
+
 [cyan::b]Navigation[-::-]
   j / ↓       Move down
   k / ↑       Move up
