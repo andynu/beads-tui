@@ -130,5 +130,7 @@ Initial release of beads-tui, a terminal user interface for the [beads](https://
 - SQLite database access via [go-sqlite3](https://github.com/ncruces/go-sqlite3)
 - Cross-platform: macOS (Intel/Apple Silicon) and Linux (amd64/arm64)
 
+[0.3.0]: https://github.com/andynu/beads-tui/releases/tag/v0.3.0
+[0.2.1]: https://github.com/andynu/beads-tui/releases/tag/v0.2.1
 [0.2.0]: https://github.com/andynu/beads-tui/releases/tag/v0.2.0
 [0.1.0]: https://github.com/andynu/beads-tui/releases/tag/v0.1.0
