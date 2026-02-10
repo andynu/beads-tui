@@ -103,6 +103,19 @@ func PopulateIssueList(
 			}
 		}
 	}
+
+	// Show helpful message when no issues are visible
+	if len(indexToIssue) == 0 {
+		mutedColor := formatting.GetMutedColor()
+		emphasisColor := formatting.GetEmphasisColor()
+		if appState.HasActiveFilters() {
+			issueList.AddItem(fmt.Sprintf("\n  [%s]No issues match current filters[-]", mutedColor), "", 0, nil)
+			issueList.AddItem(fmt.Sprintf("  [%s]Press 'f' to modify filters[-]", emphasisColor), "", 0, nil)
+		} else {
+			issueList.AddItem(fmt.Sprintf("\n  [%s]No issues found[-]", mutedColor), "", 0, nil)
+			issueList.AddItem(fmt.Sprintf("  [%s]Press 'a' to create an issue[-]", emphasisColor), "", 0, nil)
+		}
+	}
 }
 
 // formatIssueListItem formats a single issue for the list view
