@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -1199,5 +1200,66 @@ func TestExplicitBlockedStatusDoesNotPropagate(t *testing.T) {
 	}
 	if len(blockedIssues) > 0 && blockedIssues[0].ID != "parent" {
 		t.Errorf("Expected 'parent' to be blocked, got %s", blockedIssues[0].ID)
+	}
+}
+
+func TestBuildDependencyTreeMaxDepth(t *testing.T) {
+	s := New()
+	now := time.Now()
+
+	// Create a chain deeper than maxTreeDepth (50):
+	// issue-0 -> issue-1 -> issue-2 -> ... -> issue-59
+	count := maxTreeDepth + 10
+	issues := make([]*parser.Issue, count)
+	for i := 0; i < count; i++ {
+		issue := &parser.Issue{
+			ID:        fmt.Sprintf("issue-%d", i),
+			Title:     fmt.Sprintf("Issue %d", i),
+			Status:    parser.StatusOpen,
+			Priority:  2,
+			IssueType: parser.TypeTask,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if i > 0 {
+			issue.Dependencies = []*parser.Dependency{
+				{
+					IssueID:     fmt.Sprintf("issue-%d", i),
+					DependsOnID: fmt.Sprintf("issue-%d", i-1),
+					Type:        parser.DepParentChild,
+					CreatedAt:   now,
+					CreatedBy:   "test",
+				},
+			}
+		}
+		issues[i] = issue
+	}
+
+	s.LoadIssues(issues)
+	s.SetViewMode(ViewTree)
+	tree := s.GetTreeNodes()
+
+	// Should build without panic and should have a tree
+	if len(tree) == 0 {
+		t.Fatal("Expected tree nodes, got empty tree")
+	}
+
+	// Verify the tree doesn't go deeper than maxTreeDepth
+	var measureDepth func(node *TreeNode) int
+	measureDepth = func(node *TreeNode) int {
+		max := node.Depth
+		for _, child := range node.Children {
+			if d := measureDepth(child); d > max {
+				max = d
+			}
+		}
+		return max
+	}
+
+	for _, node := range tree {
+		depth := measureDepth(node)
+		if depth >= maxTreeDepth {
+			t.Errorf("Tree depth %d exceeds max depth %d", depth, maxTreeDepth)
+		}
 	}
 }

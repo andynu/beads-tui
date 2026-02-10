@@ -27,6 +27,15 @@ func PopulateIssueList(
 	}
 	currentIndex := 0
 
+	// Show filter indicator when filters are active
+	if appState.HasActiveFilters() {
+		warningColor := formatting.GetWarningColor()
+		emphasisColor := formatting.GetEmphasisColor()
+		issueList.AddItem(fmt.Sprintf("[%s::b]⊘ FILTERED[-::-] [%s]%s[-] — press f to modify",
+			warningColor, emphasisColor, appState.GetActiveFilters()), "", 0, nil)
+		currentIndex++
+	}
+
 	// Check view mode
 	if appState.GetViewMode() == state.ViewTree {
 		// Tree view
@@ -101,6 +110,19 @@ func PopulateIssueList(
 					currentIndex++
 				}
 			}
+		}
+	}
+
+	// Show helpful message when no issues are visible
+	if len(indexToIssue) == 0 {
+		mutedColor := formatting.GetMutedColor()
+		emphasisColor := formatting.GetEmphasisColor()
+		if appState.HasActiveFilters() {
+			issueList.AddItem(fmt.Sprintf("\n  [%s]No issues match current filters[-]", mutedColor), "", 0, nil)
+			issueList.AddItem(fmt.Sprintf("  [%s]Press 'f' to modify filters[-]", emphasisColor), "", 0, nil)
+		} else {
+			issueList.AddItem(fmt.Sprintf("\n  [%s]No issues found[-]", mutedColor), "", 0, nil)
+			issueList.AddItem(fmt.Sprintf("  [%s]Press 'a' to create an issue[-]", emphasisColor), "", 0, nil)
 		}
 	}
 }
@@ -185,12 +207,12 @@ func renderTreeNode(
 	collapseIndicator := ""
 	if hasChildren {
 		if isCollapsed {
-			collapseIndicator = "[+] " // Collapsed - can expand
+			collapseIndicator = "▶ " // Collapsed - can expand
 		} else {
-			collapseIndicator = "[-] " // Expanded - can collapse
+			collapseIndicator = "▼ " // Expanded - can collapse
 		}
 	} else {
-		collapseIndicator = "    " // Leaf node - no indicator (maintain alignment)
+		collapseIndicator = "  " // Leaf node - no indicator (maintain alignment)
 	}
 
 	// Format issue line

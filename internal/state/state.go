@@ -485,6 +485,14 @@ func (s *State) buildDependencyTree() {
 	hasIncomingDep := make(map[string]bool)               // issues that have parents or blockers
 	idPrefixChildren := make(map[string][]*parser.Issue)  // parent ID -> children by ID prefix (e.g., "epic-1" -> ["epic-1.1", "epic-1.2"])
 
+	// Build set of open issue IDs for O(1) parent lookup
+	openIssueIDs := make(map[string]*parser.Issue, len(s.issues))
+	for _, issue := range s.issues {
+		if issue.Status != parser.StatusClosed {
+			openIssueIDs[issue.ID] = issue
+		}
+	}
+
 	// First pass: build relationship maps
 	for _, issue := range s.issues {
 		// Skip closed issues in tree view
@@ -493,15 +501,13 @@ func (s *State) buildDependencyTree() {
 		}
 
 		// Check for ID-based parent-child relationship (e.g., tui-y4h.1 is child of tui-y4h)
-		// This works for both epics and regular issues
-		for _, potentialParent := range s.issues {
-			if potentialParent.Status == parser.StatusClosed {
-				continue
-			}
-			// Check if this issue's ID starts with parent ID followed by a dot
-			if issue.ID != potentialParent.ID && len(issue.ID) > len(potentialParent.ID) {
-				if issue.ID[:len(potentialParent.ID)] == potentialParent.ID && issue.ID[len(potentialParent.ID)] == '.' {
-					idPrefixChildren[potentialParent.ID] = append(idPrefixChildren[potentialParent.ID], issue)
+		// Find parent by looking for the longest prefix before the last dot.
+		// E.g., "tui-y4h.2.1" -> check "tui-y4h.2" first, then "tui-y4h"
+		for i := len(issue.ID) - 1; i >= 0; i-- {
+			if issue.ID[i] == '.' {
+				candidateParentID := issue.ID[:i]
+				if _, ok := openIssueIDs[candidateParentID]; ok {
+					idPrefixChildren[candidateParentID] = append(idPrefixChildren[candidateParentID], issue)
 					hasIncomingDep[issue.ID] = true
 					break
 				}
@@ -572,10 +578,18 @@ func (s *State) buildDependencyTree() {
 	}
 }
 
+// maxTreeDepth is the maximum allowed nesting depth for tree building.
+// Prevents stack overflow with pathological dependency chains.
+const maxTreeDepth = 50
+
 // buildTreeNode recursively builds a tree node and its children
 func (s *State) buildTreeNode(issue *parser.Issue, depth int, childrenMap map[string][]*parser.Issue, blockedByMap map[string][]*parser.Issue, visited map[string]bool) *TreeNode {
 	// Prevent cycles
 	if visited[issue.ID] {
+		return nil
+	}
+	// Prevent stack overflow with deeply nested trees
+	if depth >= maxTreeDepth {
 		return nil
 	}
 	visited[issue.ID] = true
