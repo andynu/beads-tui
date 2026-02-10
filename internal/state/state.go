@@ -572,10 +572,18 @@ func (s *State) buildDependencyTree() {
 	}
 }
 
+// maxTreeDepth is the maximum allowed nesting depth for tree building.
+// Prevents stack overflow with pathological dependency chains.
+const maxTreeDepth = 50
+
 // buildTreeNode recursively builds a tree node and its children
 func (s *State) buildTreeNode(issue *parser.Issue, depth int, childrenMap map[string][]*parser.Issue, blockedByMap map[string][]*parser.Issue, visited map[string]bool) *TreeNode {
 	// Prevent cycles
 	if visited[issue.ID] {
+		return nil
+	}
+	// Prevent stack overflow with deeply nested trees
+	if depth >= maxTreeDepth {
 		return nil
 	}
 	visited[issue.ID] = true
