@@ -217,10 +217,28 @@ func main() {
 
 	// Helper function to generate issue list title with view mode indicator
 	getIssueListTitle := func() string {
+		mode := "List"
+		toggle := "Tree"
 		if appState.GetViewMode() == state.ViewTree {
-			return "Issues [Tree] (t:List)"
+			mode = "Tree"
+			toggle = "List"
 		}
-		return "Issues [List] (t:Tree)"
+		// Show position indicator if on an issue
+		posStr := ""
+		if issueList.GetItemCount() > 0 {
+			currentIdx := issueList.GetCurrentItem()
+			if _, ok := indexToIssue[currentIdx]; ok {
+				// Count which issue number this is (1-based)
+				issueNum := 0
+				for i := 0; i <= currentIdx; i++ {
+					if _, ok := indexToIssue[i]; ok {
+						issueNum++
+					}
+				}
+				posStr = fmt.Sprintf(" %d/%d", issueNum, len(indexToIssue))
+			}
+		}
+		return fmt.Sprintf("Issues [%s]%s (t:%s)", mode, posStr, toggle)
 	}
 
 	// Helper function to generate status bar text
@@ -547,6 +565,8 @@ func main() {
 		if issue, ok := indexToIssue[index]; ok {
 			showIssueDetails(issue)
 		}
+		// Update title to reflect current position
+		issueList.SetTitle(getIssueListTitle())
 	})
 
 	// Layout builder function
