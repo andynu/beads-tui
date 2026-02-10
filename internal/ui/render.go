@@ -207,12 +207,12 @@ func renderTreeNode(
 	collapseIndicator := ""
 	if hasChildren {
 		if isCollapsed {
-			collapseIndicator = "[+] " // Collapsed - can expand
+			collapseIndicator = "▶ " // Collapsed - can expand
 		} else {
-			collapseIndicator = "[-] " // Expanded - can collapse
+			collapseIndicator = "▼ " // Expanded - can collapse
 		}
 	} else {
-		collapseIndicator = "    " // Leaf node - no indicator (maintain alignment)
+		collapseIndicator = "  " // Leaf node - no indicator (maintain alignment)
 	}
 
 	// Format issue line
