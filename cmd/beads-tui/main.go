@@ -30,6 +30,23 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	// statusMessageDuration is how long temporary status bar messages are shown.
+	statusMessageDuration = 2 * time.Second
+
+	// refreshDelay is the delay before auto-refreshing after an update command.
+	refreshDelay = 500 * time.Millisecond
+
+	// queueUpdateTimeout is the max wait for tview QueueUpdateDraw calls.
+	queueUpdateTimeout = 10 * time.Second
+
+	// dbLoadTimeout is the max wait for database load operations.
+	dbLoadTimeout = 5 * time.Second
+
+	// watcherDebounce is the file watcher debounce interval.
+	watcherDebounce = 200 * time.Millisecond
+)
+
 func main() {
 	// Parse command line flags
 	debugMode := flag.Bool("debug", false, "Enable debug logging to file")
@@ -295,7 +312,7 @@ func main() {
 		select {
 		case <-done:
 			// Success - update queued normally
-		case <-time.After(10 * time.Second):
+		case <-time.After(queueUpdateTimeout):
 			log.Printf("WARNING: QueueUpdateDraw timed out after 10s")
 		}
 	}
@@ -333,7 +350,7 @@ func main() {
 		}
 
 		// Schedule new refresh
-		refreshTimer = time.AfterFunc(500*time.Millisecond, func() {
+		refreshTimer = time.AfterFunc(refreshDelay, func() {
 			log.Printf("SCHEDULE: Delayed refresh starting for issue: %s", issueID)
 			refreshIssues(issueID)
 		})
@@ -368,7 +385,7 @@ func main() {
 		}
 
 		// Load issues from SQLite with timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), dbLoadTimeout)
 		defer cancel()
 
 		log.Printf("REFRESH: Loading issues from SQLite (timeout=5s)")
@@ -420,7 +437,7 @@ func main() {
 	}
 
 	// Initial load (before app starts, no QueueUpdateDraw)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), dbLoadTimeout)
 	issues, err := sqliteReader.LoadIssues(ctx)
 	cancel()
 	if err != nil {
@@ -479,7 +496,7 @@ func main() {
 
 	// Set up filesystem watcher on the database
 	log.Printf("Setting up file watcher on: %s", dbPath)
-	fileWatcher, err := watcher.New(dbPath, 200*time.Millisecond, func() {
+	fileWatcher, err := watcher.New(dbPath, watcherDebounce, func() {
 		log.Printf("WATCHER: File change detected, triggering refresh")
 		refreshIssues()
 	})
@@ -529,7 +546,7 @@ func main() {
 					statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 				} else {
 					log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", currentDetailIssue.ID)
-					showTemporaryStatus(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID), 2*time.Second)
+					showTemporaryStatus(fmt.Sprintf("[%s]✓ Copied %s to clipboard[-]", formatting.GetSuccessColor(), currentDetailIssue.ID), statusMessageDuration)
 				}
 			}
 		}
@@ -1059,12 +1076,12 @@ func main() {
 								}
 							}
 							if isCollapsed {
-								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %s", issue.ID)), 2*time.Second)
+								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %s", issue.ID)), statusMessageDuration)
 							} else {
-								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %s", issue.ID)), 2*time.Second)
+								showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %s", issue.ID)), statusMessageDuration)
 							}
 						} else {
-							showTemporaryStatus(errorMsg("No children to collapse"), 2*time.Second)
+							showTemporaryStatus(errorMsg("No children to collapse"), statusMessageDuration)
 						}
 					}
 				}
@@ -1076,9 +1093,9 @@ func main() {
 					saveCollapseState()
 					populateIssueList()
 					if count > 0 {
-						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %d nodes", count)), 2*time.Second)
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Expanded %d nodes", count)), statusMessageDuration)
 					} else {
-						showTemporaryStatus(successMsg("✓ All nodes already expanded"), 2*time.Second)
+						showTemporaryStatus(successMsg("✓ All nodes already expanded"), statusMessageDuration)
 					}
 				}
 				return nil
@@ -1089,9 +1106,9 @@ func main() {
 					saveCollapseState()
 					populateIssueList()
 					if count > 0 {
-						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %d nodes", count)), 2*time.Second)
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Collapsed %d nodes", count)), statusMessageDuration)
 					} else {
-						showTemporaryStatus(successMsg("✓ All nodes already collapsed"), 2*time.Second)
+						showTemporaryStatus(successMsg("✓ All nodes already collapsed"), statusMessageDuration)
 					}
 				}
 				return nil
@@ -1121,9 +1138,9 @@ func main() {
 				showPrefix = !showPrefix
 				populateIssueList()
 				if showPrefix {
-					showTemporaryStatus(successMsg("Prefix: shown"), 2*time.Second)
+					showTemporaryStatus(successMsg("Prefix: shown"), statusMessageDuration)
 				} else {
-					showTemporaryStatus(successMsg("Prefix: hidden"), 2*time.Second)
+					showTemporaryStatus(successMsg("Prefix: hidden"), statusMessageDuration)
 				}
 				return nil
 			case 'a':
@@ -1151,7 +1168,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID to clipboard: %s", issue.ID)
-						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)), 2*time.Second)
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied %s to clipboard", issue.ID)), statusMessageDuration)
 					}
 				}
 				return nil
@@ -1165,7 +1182,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied issue ID with title to clipboard: %s", text)
-						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)), 2*time.Second)
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied '%s' to clipboard", text)), statusMessageDuration)
 					}
 				}
 				return nil
@@ -1179,7 +1196,7 @@ func main() {
 						statusBar.SetText(fmt.Sprintf("[%s]Failed to copy: %v[-]", formatting.GetErrorColor(), err))
 					} else {
 						log.Printf("CLIPBOARD: Copied branch name to clipboard: %s", branchName)
-						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)), 2*time.Second)
+						showTemporaryStatus(successMsg(fmt.Sprintf("✓ Copied branch name '%s' to clipboard", branchName)), statusMessageDuration)
 					}
 				}
 				return nil
@@ -1232,7 +1249,7 @@ func main() {
 				lastKeyWasS = true
 				statusBar.SetText(fmt.Sprintf("[%s]Status shortcut: o/i/b/c[-]", formatting.GetEmphasisColor()))
 				// Reset after 2 seconds if no second key
-				time.AfterFunc(2*time.Second, func() {
+				time.AfterFunc(statusMessageDuration, func() {
 					safeQueueUpdateDraw(func() {
 						if lastKeyWasS {
 							lastKeyWasS = false
