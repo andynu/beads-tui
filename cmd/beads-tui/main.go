@@ -775,13 +775,9 @@ func main() {
 				updatePanelFocus()
 				return nil
 			case tcell.KeyEscape:
-				// Hide detail pane and return focus to issue list
-				detailPaneVisible = false
+				// Return focus to issue list (keep detail pane visible)
 				detailPanelFocused = false
-				newFlex := buildLayout()
-				pages.RemovePage("main")
-				pages.AddPage("main", newFlex, true, true)
-				statusBar.SetText(getStatusBarText())
+				updatePanelFocus()
 				return nil
 			case tcell.KeyCtrlD:
 				// Scroll down half page
