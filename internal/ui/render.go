@@ -27,6 +27,15 @@ func PopulateIssueList(
 	}
 	currentIndex := 0
 
+	// Show filter indicator when filters are active
+	if appState.HasActiveFilters() {
+		warningColor := formatting.GetWarningColor()
+		emphasisColor := formatting.GetEmphasisColor()
+		issueList.AddItem(fmt.Sprintf("[%s::b]⊘ FILTERED[-::-] [%s]%s[-] — press f to modify",
+			warningColor, emphasisColor, appState.GetActiveFilters()), "", 0, nil)
+		currentIndex++
+	}
+
 	// Check view mode
 	if appState.GetViewMode() == state.ViewTree {
 		// Tree view
